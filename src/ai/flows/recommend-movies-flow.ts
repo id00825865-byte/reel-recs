@@ -35,13 +35,23 @@ export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
 export async function recommendMovies(input: RecommendMoviesInput): Promise<RecommendMoviesOutput> {
   try {
-    return await recommendMoviesFlow(input);
-  } catch (error: any) {
-    console.error('Error in recommendMovies flow:', error);
-    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key not found')) {
-      throw new Error('Configuración incompleta: No se encontró una clave API de Gemini válida en el archivo .env');
+    // Verificar si la API Key está configurada antes de llamar al flujo
+    if (!process.env.GOOGLE_GENAI_API_KEY) {
+      throw new Error('MISSING_API_KEY');
     }
-    throw new Error('Error al obtener recomendaciones de películas. Inténtalo de nuevo más tarde.');
+
+    const result = await recommendMoviesFlow(input);
+    return result;
+  } catch (error: any) {
+    console.error('Error detallado en recommendMovies:', error);
+    
+    // Errores específicos de API Key
+    if (error.message === 'MISSING_API_KEY' || error.message?.includes('API_KEY_INVALID') || error.message?.includes('403')) {
+      throw new Error('CONFIG_ERROR: No se encontró una clave API de Gemini válida. Por favor, configúrala en el archivo .env como GOOGLE_GENAI_API_KEY.');
+    }
+    
+    // Error genérico pero con más información
+    throw new Error('No pudimos obtener recomendaciones. Esto puede deberse a un problema de conexión con Gemini o a que se han superado los límites de uso gratuito.');
   }
 }
 
@@ -70,7 +80,7 @@ const recommendMoviesFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output) {
-      throw new Error('Failed to get movie recommendations from the AI.');
+      throw new Error('El modelo de IA no devolvió resultados válidos.');
     }
     return output;
   }

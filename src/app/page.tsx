@@ -5,14 +5,16 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendMoviesOutput | null>(null);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -20,15 +22,21 @@ export default function Home() {
     if (!preferences.trim()) return;
 
     setLoading(true);
-    setRecommendations(null); // Limpiar resultados previos
+    setRecommendations(null);
+    setErrorStatus(null);
 
     try {
       const results = await recommendMovies({ preferences });
       setRecommendations(results);
     } catch (error: any) {
+      const msg = error.message || "";
+      setErrorStatus(msg);
+      
       toast({
-        title: "Error de conexión",
-        description: error.message || "No pudimos obtener tus recomendaciones. Revisa tu conexión o configuración.",
+        title: "Error en la búsqueda",
+        description: msg.includes('CONFIG_ERROR') 
+          ? "Falta configurar la clave API de Gemini." 
+          : "No pudimos conectar con el servicio de recomendaciones.",
         variant: "destructive",
       });
     } finally {
@@ -39,6 +47,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
       <Toaster />
+      
       {/* Hero Section */}
       <header className="w-full max-w-7xl px-6 pt-16 pb-12 flex flex-col items-center text-center">
         <div className="flex items-center gap-3 mb-6 animate-in fade-in slide-in-from-top duration-700">
@@ -59,7 +68,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-primary/20 blur-2xl group-focus-within:bg-accent/20 transition-colors duration-500 rounded-full -z-10" />
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border shadow-2xl focus-within:border-primary/50 transition-all duration-300">
               <Input
-                placeholder="¿Qué te apetece ver? (ej. 'Acción con Tom Cruise' o 'Algo como Inception')"
+                placeholder="¿Qué te apetece ver? (ej. 'Acción con Tom Cruise')"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50 px-6"
@@ -82,9 +91,33 @@ export default function Home() {
               </Button>
             </div>
           </form>
+          
+          {/* Error Alert for Config Issues */}
+          {errorStatus?.includes('CONFIG_ERROR') && (
+            <Alert variant="destructive" className="mt-6 text-left border-destructive/50 bg-destructive/10">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="font-bold">Configuración Requerida</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>Para que ReelRecs funcione, necesitas añadir una <strong>Gemini API Key</strong>.</p>
+                <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                  <a 
+                    href="https://aistudio.google.com/app/apikey" 
+                    target="_blank" 
+                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    Obtener API Key Gratis <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <p className="text-xs text-muted-foreground flex items-center italic">
+                    Pégala en tu archivo .env como GOOGLE_GENAI_API_KEY
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <span className="text-sm text-muted-foreground">Sugerencias:</span>
-            {['Thrillers neo-noir', 'Vibras de Wes Anderson', 'Comedias románticas de los 90', 'Exploración espacial'].map((suggestion) => (
+            {['Thrillers neo-noir', 'Vibras de Wes Anderson', 'Comedias románticas de los 90'].map((suggestion) => (
               <button
                 key={suggestion}
                 onClick={() => setPreferences(suggestion)}
@@ -99,7 +132,7 @@ export default function Home() {
 
       {/* Results Section */}
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
-        {!recommendations && !loading && (
+        {!recommendations && !loading && !errorStatus && (
           <div className="flex flex-col items-center justify-center pt-20 text-center text-muted-foreground opacity-40 animate-in fade-in duration-1000">
             <Clapperboard className="w-24 h-24 mb-6 stroke-1" />
             <p className="text-lg italic font-headline">Tu viaje cinematográfico comienza aquí...</p>
@@ -113,7 +146,6 @@ export default function Home() {
                 <div className="flex-1 bg-muted/20 rounded-t-2xl" />
                 <div className="p-6 space-y-4">
                   <div className="h-6 w-3/4 bg-muted/20 rounded" />
-                  <div className="h-4 w-full bg-muted/20 rounded" />
                   <div className="h-4 w-full bg-muted/20 rounded" />
                 </div>
               </div>
