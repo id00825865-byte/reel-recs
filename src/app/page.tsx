@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -6,31 +7,40 @@ import { MovieCard } from '@/components/movie-card';
 import { AuthForm } from '@/components/auth-form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendMoviesOutput | null>(null);
+  const [activeTab, setActiveTab] = useState('explore');
   
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
 
-  // Obtener peliculas vistas del usuario
+  // Suscribirse a películas vistas
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return query(collection(db, 'users', user.uid, 'watchedMovies'));
+    return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
   }, [db, user]);
-  
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   const watchedTitles = watchedMovies?.map(m => m.title) || [];
+
+  // Suscribirse a lista de deseos
+  const watchlistQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
+  }, [db, user]);
+  const { data: watchlistMovies } = useCollection(watchlistQuery);
+  const watchlistTitles = watchlistMovies?.map(m => m.title) || [];
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +55,7 @@ export default function Home() {
         excludeMovies: watchedTitles 
       });
       setRecommendations(results);
+      setActiveTab('explore');
     } catch (error: any) {
       toast({
         title: "Error en la búsqueda",
@@ -87,12 +98,12 @@ export default function Home() {
       
       {/* Navbar con Usuario */}
       <nav className="w-full border-b border-border/10 bg-card/30 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('explore')}>
           <Film className="w-6 h-6 text-primary" />
           <span className="font-headline text-2xl font-bold">ReelRecs</span>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
+          <div className="hidden md:flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
             <UserIcon className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">{user.email}</span>
           </div>
@@ -102,72 +113,134 @@ export default function Home() {
         </div>
       </nav>
 
-      <header className="w-full max-w-7xl px-6 pt-16 pb-12 flex flex-col items-center text-center">
-        <h1 className="font-headline text-5xl md:text-7xl font-black mb-4 tracking-tight">
-          ¿Qué <span className="text-primary italic">sentimos</span> hoy?
+      <header className="w-full max-w-7xl px-6 pt-12 pb-8 flex flex-col items-center text-center">
+        <h1 className="font-headline text-4xl md:text-6xl font-black mb-4 tracking-tight">
+          ¿Qué <span className="text-primary italic">cine</span> te apetece?
         </h1>
-        <p className="font-body text-xl text-muted-foreground max-w-2xl mb-12">
-          IA personalizada que ignora las {watchedMovies?.length || 0} películas que ya has visto.
-        </p>
-
-        <section className="w-full max-w-3xl">
+        
+        <section className="w-full max-w-3xl mt-8">
           <form onSubmit={handleSearch} className="relative group">
-            <div className="relative flex flex-col md:flex-row gap-4 p-3 bg-card rounded-3xl border border-border/50 shadow-[0_20px_50px_rgba(0,0,0,0.3)] focus-within:border-primary/50 transition-all duration-500">
+            <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl focus-within:border-primary/50 transition-all">
               <Input
                 placeholder="Busca por género, humor o películas similares..."
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
-                className="flex-1 bg-transparent border-none text-xl h-16 focus-visible:ring-0 px-6"
+                className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 px-4"
                 disabled={loading}
               />
               <Button 
                 type="submit" 
                 size="lg" 
-                className="h-16 md:px-10 bg-primary hover:bg-primary/90 rounded-2xl gap-2"
+                className="h-14 md:px-8 bg-primary hover:bg-primary/90 rounded-xl gap-2 font-bold"
                 disabled={loading || !preferences.trim()}
               >
-                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Sparkles className="w-6 h-6" /> Buscar</>}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Buscar</>}
               </Button>
             </div>
           </form>
         </section>
       </header>
 
-      {/* Resultados */}
+      {/* Secciones de Contenido */}
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mt-12">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="aspect-[2/3] bg-card/30 rounded-3xl animate-pulse border border-border/20" />
-            ))}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex justify-center mb-8">
+            <TabsList className="bg-secondary/40 p-1 rounded-xl h-12 border border-border/30">
+              <TabsTrigger value="explore" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
+                <Sparkle className="w-4 h-4" /> Recomendaciones
+              </TabsTrigger>
+              <TabsTrigger value="watchlist" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
+                <Bookmark className="w-4 h-4" /> Por ver
+              </TabsTrigger>
+              <TabsTrigger value="history" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
+                <History className="w-4 h-4" /> Historial
+              </TabsTrigger>
+            </TabsList>
           </div>
-        )}
 
-        {recommendations && !loading && (
-          <div className="mt-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <div className="flex items-center gap-3 mb-10">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border" />
-              <h2 className="font-headline text-3xl font-bold flex items-center gap-3 px-4 text-primary italic">
-                Sugerencias para ti
-              </h2>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-              {recommendations.movies.map((movie, idx) => (
-                <MovieCard 
-                  key={`${movie.title}-${idx}`} 
-                  movie={movie} 
-                  index={idx}
-                  isWatched={watchedTitles.includes(movie.title)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          {/* EXPLORAR / RECOMENDACIONES */}
+          <TabsContent value="explore" className="mt-0 outline-none">
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="aspect-[2/3] bg-card/30 rounded-2xl animate-pulse border border-border/10" />
+                ))}
+              </div>
+            ) : recommendations ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                {recommendations.movies.map((movie, idx) => (
+                  <MovieCard 
+                    key={`${movie.title}-${idx}`} 
+                    movie={movie} 
+                    index={idx}
+                    isWatched={watchedTitles.includes(movie.title)}
+                    isInWatchlist={watchlistTitles.includes(movie.title)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
+                <Sparkle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">Usa el buscador para generar recomendaciones mágicas</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* POR VER (WATCHLIST) */}
+          <TabsContent value="watchlist" className="mt-0 outline-none">
+            {watchlistMovies && watchlistMovies.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                {watchlistMovies.map((movie, idx) => (
+                  <MovieCard 
+                    key={movie.id} 
+                    movie={{
+                      title: movie.title,
+                      posterUrl: movie.posterUrl,
+                      synopsis: "",
+                    }} 
+                    index={idx}
+                    isInWatchlist={true}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
+                <Bookmark className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">Aún no tienes películas guardadas para ver luego</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* HISTORIAL (WATCHED) */}
+          <TabsContent value="history" className="mt-0 outline-none">
+            {watchedMovies && watchedMovies.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                {watchedMovies.map((movie, idx) => (
+                  <MovieCard 
+                    key={movie.id} 
+                    movie={{
+                      title: movie.title,
+                      posterUrl: movie.posterUrl,
+                      synopsis: "",
+                      rating: movie.rating
+                    }} 
+                    index={idx}
+                    isWatched={true}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
+                <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">Aún no has marcado ninguna película como vista</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       <footer className="w-full py-10 border-t border-border/10 text-center text-muted-foreground/40 text-sm">
-        <p>© {new Date().getFullYear()} ReelRecs. Tu historial de {watchedMovies?.length || 0} películas está a salvo.</p>
+        <p>© {new Date().getFullYear()} ReelRecs. IA que recuerda tus {watchedMovies?.length || 0} películas.</p>
       </footer>
     </main>
   );
