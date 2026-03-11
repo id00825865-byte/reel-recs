@@ -22,7 +22,7 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
-        posterUrl: z.string().url().describe('A URL to the movie poster image.'),
+        posterUrl: z.string().url().describe('A direct URL to the movie official poster. MUST be from image.tmdb.org or m.media-amazon.com if possible.'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         director: z.string().describe('The name of the movie\'s director.'),
         actors: z.array(z.string()).describe('A list of the main actors in the movie.'),
@@ -37,20 +37,15 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
   try {
     const keyToUse = process.env.GOOGLE_GENAI_API_KEY;
 
-    if (!keyToUse || keyToUse.includes('TU_CLAVE_AQUI') || keyToUse.includes('PEGAR_AQUI')) {
-      throw new Error('CONFIG_ERROR: El servidor no tiene configurada la clave API de Google Gemini.');
+    if (!keyToUse) {
+      throw new Error('CONFIG_ERROR: El servidor no tiene configurada la clave API.');
     }
 
     const result = await recommendMoviesFlow(input);
     return result;
   } catch (error: any) {
     console.error('Error en recommendMovies:', error);
-    
-    if (error.message?.includes('CONFIG_ERROR')) {
-      throw new Error('Error de configuración: Contacta con el administrador.');
-    }
-    
-    throw new Error('No pudimos obtener recomendaciones en este momento. Inténtalo más tarde.');
+    throw new Error('No pudimos obtener recomendaciones. Verifica la API Key o intenta más tarde.');
   }
 }
 
@@ -58,21 +53,16 @@ const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie recommender. Your task is to analyze the user's preferences and provide at least three highly relevant movie recommendations.
+  prompt: `You are an expert movie librarian. Your goal is to provide high-quality movie recommendations.
 
-For each movie:
-- Provide the title.
-- Provide a direct, valid URL to the movie's official poster. 
-- Prioritize high-quality sources like:
-  * https://image.tmdb.org/t/p/w500/...
-  * https://m.media-amazon.com/images/M/...
-- CRITICAL: Ensure the URL ends in .jpg or .png.
-- If you cannot find a direct official poster URL that is 100% reliable, use the following placeholder which is guaranteed to work:
-  https://picsum.photos/seed/{{title}}/600/900
-- Provide a concise and engaging synopsis.
-- Provide the director and main cast.
+CRITICAL INSTRUCTIONS FOR IMAGES:
+1. You MUST provide a valid, high-quality official movie poster URL.
+2. PRIORITIZE URLs from The Movie Database (TMDB). They usually look like this: https://image.tmdb.org/t/p/w500/<unique_id>.jpg
+3. ALTERNATIVELY, use Amazon/IMDb images: https://m.media-amazon.com/images/M/<unique_id>.jpg
+4. DO NOT use generic or placeholder URLs unless it is absolutely impossible to find the real one. 
+5. Ensure the URL is public and does not require authentication.
 
-User preferences: {{{preferences}}}`,
+User movie preferences: {{{preferences}}}`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
@@ -84,7 +74,7 @@ const recommendMoviesFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output) {
-      throw new Error('El modelo de IA no devolvió resultados válidos.');
+      throw new Error('La IA no pudo generar resultados.');
     }
     return output;
   }
