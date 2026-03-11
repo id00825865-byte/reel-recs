@@ -6,11 +6,12 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle, ExternalLink, Key } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, AlertCircle, ExternalLink, Key, HelpCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
@@ -46,7 +47,7 @@ export default function Home() {
     }
   };
 
-  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || errorStatus === null && recommendations === null && !loading;
+  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || (recommendations === null && !loading);
 
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
@@ -110,8 +111,8 @@ export default function Home() {
         </section>
       </header>
 
-      {/* Configuration Guide (Visible if there's no data or an error) */}
-      {(errorStatus?.includes('CONFIG_ERROR') || (recommendations === null && !loading)) && (
+      {/* Configuration Guide */}
+      {isConfigError && (
         <section className="w-full max-w-2xl px-6 mb-12 animate-in fade-in duration-700 delay-500">
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader>
@@ -121,23 +122,46 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-left">
-              <p className="text-sm text-muted-foreground">
-                Para que la IA funcione, necesitamos conectarla con Google. Sigue estos 3 pasos rápidos:
-              </p>
-              <ol className="list-decimal list-inside space-y-2 text-sm">
-                <li>
-                  Haz clic aquí para 
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary font-bold hover:underline mx-1 inline-flex items-center gap-1">
-                    obtener tu API Key <ExternalLink className="w-3 h-3" />
-                  </a> 
-                  (es gratis).
-                </li>
-                <li>Copia el código que te den (empieza por "AIza...").</li>
-                <li>Abre el archivo <b>.env</b> a la izquierda de tu pantalla y pégalo ahí.</li>
-              </ol>
-              <div className="p-3 bg-card rounded-md border text-xs font-mono text-muted-foreground break-all">
-                GOOGLE_GENAI_API_KEY=tu_clave_aqui
+              <div className="space-y-4">
+                <div className="flex gap-4 items-start">
+                  <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">1</div>
+                  <p className="text-sm">
+                    Entra en 
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary font-bold hover:underline mx-1 inline-flex items-center gap-1">
+                      Google AI Studio <ExternalLink className="w-3 h-3" />
+                    </a> 
+                    y pulsa el botón azul que dice <b>"Create API key in new project"</b>.
+                  </p>
+                </div>
+
+                <div className="flex gap-4 items-start">
+                  <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">2</div>
+                  <p className="text-sm">
+                    Copia el código que te darán (empieza por "AIza...").
+                  </p>
+                </div>
+
+                <div className="flex gap-4 items-start">
+                  <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">3</div>
+                  <p className="text-sm">
+                    Abre el archivo <b>.env</b> (en el menú de la izquierda) y pega tu código ahí.
+                  </p>
+                </div>
               </div>
+
+              <div className="mt-6 p-4 bg-background rounded-lg border border-primary/20 border-dashed">
+                <p className="text-xs font-mono text-muted-foreground mb-2 italic">Ejemplo de cómo debe quedar tu archivo .env:</p>
+                <code className="text-xs font-mono text-primary break-all">
+                  GOOGLE_GENAI_API_KEY=AIzaSyB_TuCodigoAqui...
+                </code>
+              </div>
+
+              <Alert className="bg-accent/10 border-accent/20 mt-4">
+                <HelpCircle className="h-4 w-4 text-accent" />
+                <AlertDescription className="text-xs text-muted-foreground">
+                  <b>Tip:</b> Si te sale el error "No Cloud Projects Available", cierra la ventanita y busca el botón de "new project". Google creará uno para ti al instante.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </section>
