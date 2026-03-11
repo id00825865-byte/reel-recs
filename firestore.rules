@@ -2,25 +2,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Función auxiliar para verificar si el usuario está autenticado
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    // Función auxiliar para verificar si el usuario es el dueño de los datos
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    match /users/{userId} {
+    // Regla recursiva para el usuario y todas sus subcolecciones
+    // Esto cubre /users/{userId}, /users/{userId}/watchedMovies y /users/{userId}/watchlist
+    match /users/{userId}/{allPaths=**} {
       allow read, write: if isOwner(userId);
-      
-      match /watchedMovies/{watchedMovieId} {
-        allow read, write: if isOwner(userId);
-      }
-      
-      match /watchlist/{watchlistId} {
-        allow read, write: if isOwner(userId);
-      }
     }
 
+    // Regla para la colección global de películas (si existiera)
     match /movies/{movieId} {
       allow read: if true;
       allow write: if false;
