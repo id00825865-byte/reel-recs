@@ -14,6 +14,7 @@ const RecommendMoviesInputSchema = z.object({
   preferences: z
     .string()
     .describe('The user\'s natural language description of movie preferences (e.g., genres, actors, mood, similar movies).'),
+  apiKey: z.string().optional().describe('Optional manual API key provided by the user.'),
 });
 export type RecommendMoviesInput = z.infer<typeof RecommendMoviesInputSchema>;
 
@@ -35,9 +36,17 @@ export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
 export async function recommendMovies(input: RecommendMoviesInput): Promise<RecommendMoviesOutput> {
   try {
-    // Verificar si la API Key está configurada antes de llamar al flujo
-    if (!process.env.GOOGLE_GENAI_API_KEY) {
+    const keyToUse = input.apiKey || process.env.GOOGLE_GENAI_API_KEY;
+
+    if (!keyToUse || keyToUse === 'TU_CLAVE_AQUI' || keyToUse === 'PEGAR_AQUI_TU_CODIGO_AIza') {
       throw new Error('MISSING_API_KEY');
+    }
+
+    // Configurar la API Key dinámicamente si se proporciona manualmente
+    // Nota: En un entorno real de Genkit, esto se manejaría mediante el plugin,
+    // aquí asumimos que el entorno o el input proporcionan la clave válida.
+    if (input.apiKey) {
+      process.env.GOOGLE_GENAI_API_KEY = input.apiKey;
     }
 
     const result = await recommendMoviesFlow(input);
@@ -45,13 +54,11 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
   } catch (error: any) {
     console.error('Error detallado en recommendMovies:', error);
     
-    // Errores específicos de API Key
     if (error.message === 'MISSING_API_KEY' || error.message?.includes('API_KEY_INVALID') || error.message?.includes('403')) {
-      throw new Error('CONFIG_ERROR: No se encontró una clave API de Gemini válida. Por favor, configúrala en el archivo .env como GOOGLE_GENAI_API_KEY.');
+      throw new Error('CONFIG_ERROR: No se encontró una clave API válida.');
     }
     
-    // Error genérico pero con más información
-    throw new Error('No pudimos obtener recomendaciones. Esto puede deberse a un problema de conexión con Gemini o a que se han superado los límites de uso gratuito.');
+    throw new Error('No pudimos obtener recomendaciones. Verifica tu clave API o conexión.');
   }
 }
 
