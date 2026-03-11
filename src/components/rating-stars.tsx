@@ -22,37 +22,79 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
 
   const displayRating = hoverRating || localRating;
 
+  const handleRatingClick = (newRating: number) => {
+    if (interactive && onRatingChange) {
+      setLocalRating(newRating);
+      onRatingChange(newRating);
+    }
+  };
+
   return (
-    <div className="flex gap-1" onMouseLeave={() => setHoverRating(0)}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={!interactive}
-          onMouseEnter={() => interactive && setHoverRating(star)}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (interactive && onRatingChange) {
-              setLocalRating(star); // Feedback visual instantáneo
-              onRatingChange(star);
-            }
-          }}
-          className={cn(
-            "transition-all duration-200 outline-none focus:ring-0",
-            interactive ? "hover:scale-125 cursor-pointer" : "cursor-default"
-          )}
-        >
-          <Star
-            className={cn(
-              "w-5 h-5 transition-colors duration-200",
-              star <= displayRating 
-                ? "fill-yellow-400 text-yellow-400" 
-                : "text-muted-foreground/30"
-            )}
-          />
-        </button>
-      ))}
+    <div 
+      className="flex items-center gap-1.5" 
+      onMouseLeave={() => interactive && setHoverRating(0)}
+    >
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((starIndex) => {
+          // Lógica de visualización
+          const isFull = displayRating >= starIndex;
+          const isHalf = displayRating >= starIndex - 0.5 && displayRating < starIndex;
+
+          return (
+            <div 
+              key={starIndex} 
+              className={cn(
+                "relative w-6 h-6 transition-transform duration-200",
+                interactive && "hover:scale-110"
+              )}
+            >
+              {/* Estrella de fondo (vacía) */}
+              <Star className="w-6 h-6 text-muted-foreground/20 absolute inset-0" />
+              
+              {/* Media estrella rellena */}
+              {isHalf && (
+                <div className="absolute inset-0 overflow-hidden w-[50%] z-10">
+                  <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
+                </div>
+              )}
+
+              {/* Estrella completa rellena */}
+              {isFull && (
+                <Star className="w-6 h-6 fill-yellow-400 text-yellow-400 absolute inset-0 z-10" />
+              )}
+
+              {/* Zonas interactivas ocultas */}
+              {interactive && (
+                <div className="absolute inset-0 flex z-20">
+                  <div 
+                    className="w-1/2 h-full cursor-pointer"
+                    onMouseEnter={() => setHoverRating(starIndex - 0.5)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleRatingClick(starIndex - 0.5);
+                    }}
+                  />
+                  <div 
+                    className="w-1/2 h-full cursor-pointer"
+                    onMouseEnter={() => setHoverRating(starIndex)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleRatingClick(starIndex);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Indicador numérico opcional para claridad */}
+      {displayRating > 0 && (
+        <span className="text-xs font-bold text-yellow-500/80 bg-yellow-500/10 px-2 py-0.5 rounded-full min-w-[2.5rem] text-center">
+          {displayRating.toFixed(1)}
+        </span>
+      )}
     </div>
   );
 }
