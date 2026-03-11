@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,12 +5,11 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, AlertCircle, ExternalLink, Key, HelpCircle } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, Key, HelpCircle, ExternalLink, FileCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
@@ -47,7 +45,7 @@ export default function Home() {
     }
   };
 
-  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || (recommendations === null && !loading);
+  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || (recommendations === null && !loading && !errorStatus);
 
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
@@ -111,7 +109,7 @@ export default function Home() {
         </section>
       </header>
 
-      {/* Configuration Guide */}
+      {/* Configuration Guide (Only visible if there is an error or no recommendations yet) */}
       {isConfigError && (
         <section className="w-full max-w-2xl px-6 mb-12 animate-in fade-in duration-700 delay-500">
           <Card className="border-primary/20 bg-primary/5">
@@ -121,45 +119,49 @@ export default function Home() {
                 ¿Cómo activar ReelRecs?
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-left">
+            <CardContent className="space-y-6 text-left">
               <div className="space-y-4">
                 <div className="flex gap-4 items-start">
                   <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">1</div>
                   <p className="text-sm">
-                    Entra en 
+                    Pulsa el botón azul <b>"Create API key in new project"</b> en 
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary font-bold hover:underline mx-1 inline-flex items-center gap-1">
                       Google AI Studio <ExternalLink className="w-3 h-3" />
                     </a> 
-                    y pulsa el botón azul que dice <b>"Create API key in new project"</b>.
+                    y copia el código (empieza por "AIza...").
                   </p>
                 </div>
 
                 <div className="flex gap-4 items-start">
                   <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">2</div>
-                  <p className="text-sm">
-                    Copia el código que te darán (empieza por "AIza...").
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      Busca el archivo <b className="inline-flex items-center gap-1 text-primary"><FileCode className="w-4 h-4" /> .env</b> en la lista de archivos a la izquierda (está al final).
+                    </p>
+                    <div className="p-2 bg-background/50 rounded border border-dashed border-primary/20">
+                      <p className="text-[10px] text-muted-foreground italic">Pista: Está justo encima de package.json</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-4 items-start">
                   <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">3</div>
                   <p className="text-sm">
-                    Abre el archivo <b>.env</b> (en el menú de la izquierda) y pega tu código ahí.
+                    Borra <code>TU_CLAVE_AQUI</code> y pega tu código. Asegúrate de que quede así:
                   </p>
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-background rounded-lg border border-primary/20 border-dashed">
-                <p className="text-xs font-mono text-muted-foreground mb-2 italic">Ejemplo de cómo debe quedar tu archivo .env:</p>
-                <code className="text-xs font-mono text-primary break-all">
+              <div className="p-4 bg-background rounded-lg border border-primary/20 font-mono text-xs">
+                <code className="text-primary break-all">
                   GOOGLE_GENAI_API_KEY=AIzaSyB_TuCodigoAqui...
                 </code>
               </div>
 
-              <Alert className="bg-accent/10 border-accent/20 mt-4">
+              <Alert className="bg-accent/10 border-accent/20">
                 <HelpCircle className="h-4 w-4 text-accent" />
                 <AlertDescription className="text-xs text-muted-foreground">
-                  <b>Tip:</b> Si te sale el error "No Cloud Projects Available", cierra la ventanita y busca el botón de "new project". Google creará uno para ti al instante.
+                  <b>Nota:</b> Una vez pegada la clave, vuelve aquí y pulsa el botón "Buscar". ¡Ya no verás este mensaje!
                 </AlertDescription>
               </Alert>
             </CardContent>
