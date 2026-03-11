@@ -1,10 +1,6 @@
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent.
- *
- * - recommendMovies - A function that handles the movie recommendation process.
- * - RecommendMoviesInput - The input type for the recommendMovies function.
- * - RecommendMoviesOutput - The return type for the recommendMovies function.
+ * @fileOverview A movie recommendation AI agent with memory.
  */
 
 import {ai} from '@/ai/genkit';
@@ -13,7 +9,11 @@ import {z} from 'genkit';
 const RecommendMoviesInputSchema = z.object({
   preferences: z
     .string()
-    .describe('The user\'s natural language description of movie preferences (e.g., genres, actors, mood, similar movies).'),
+    .describe('The user\'s natural language description of movie preferences.'),
+  excludeMovies: z
+    .array(z.string())
+    .optional()
+    .describe('A list of movie titles the user has already watched and should NOT be recommended.'),
 });
 export type RecommendMoviesInput = z.infer<typeof RecommendMoviesInputSchema>;
 
@@ -22,47 +22,41 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
-        posterUrl: z.string().url().describe('A direct URL to the movie official poster. MUST be from image.tmdb.org or m.media-amazon.com if possible.'),
+        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB preferred).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         director: z.string().describe('The name of the movie\'s director.'),
-        actors: z.array(z.string()).describe('A list of the main actors in the movie.'),
+        actors: z.array(z.string()).describe('A list of the main actors.'),
       })
     )
     .min(3)
-    .describe('An array of at least 3 recommended movies.'),
+    .describe('An array of recommended movies.'),
 });
 export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
 export async function recommendMovies(input: RecommendMoviesInput): Promise<RecommendMoviesOutput> {
-  try {
-    const keyToUse = process.env.GOOGLE_GENAI_API_KEY;
-
-    if (!keyToUse) {
-      throw new Error('CONFIG_ERROR: El servidor no tiene configurada la clave API.');
-    }
-
-    const result = await recommendMoviesFlow(input);
-    return result;
-  } catch (error: any) {
-    console.error('Error en recommendMovies:', error);
-    throw new Error('No pudimos obtener recomendaciones. Verifica la API Key o intenta más tarde.');
-  }
+  const result = await recommendMoviesFlow(input);
+  return result;
 }
 
 const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie librarian. Your goal is to provide high-quality movie recommendations.
+  prompt: `You are an expert movie librarian.
 
-CRITICAL INSTRUCTIONS FOR IMAGES:
-1. You MUST provide a valid, high-quality official movie poster URL.
-2. PRIORITIZE URLs from The Movie Database (TMDB). They usually look like this: https://image.tmdb.org/t/p/w500/<unique_id>.jpg
-3. ALTERNATIVELY, use Amazon/IMDb images: https://m.media-amazon.com/images/M/<unique_id>.jpg
-4. DO NOT use generic or placeholder URLs unless it is absolutely impossible to find the real one. 
-5. Ensure the URL is public and does not require authentication.
+USER PREFERENCES: {{{preferences}}}
 
-User movie preferences: {{{preferences}}}`,
+{{#if excludeMovies}}
+CRITICAL: The user has already watched the following movies. You MUST NOT recommend any of these:
+{{#each excludeMovies}}
+- {{{this}}}
+{{/each}}
+{{/if}}
+
+INSTRUCTIONS:
+1. Provide unique and high-quality recommendations.
+2. Use ONLY high-quality poster URLs from image.tmdb.org or m.media-amazon.com.
+3. If you can't find a real URL, use: https://picsum.photos/seed/{{title}}/600/900`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
@@ -73,9 +67,7 @@ const recommendMoviesFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    if (!output) {
-      throw new Error('La IA no pudo generar resultados.');
-    }
+    if (!output) throw new Error('No se pudieron generar recomendaciones.');
     return output;
   }
 );
