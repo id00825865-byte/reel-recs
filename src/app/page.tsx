@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,10 +6,11 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle, ExternalLink } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle, ExternalLink, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
@@ -44,6 +46,8 @@ export default function Home() {
     }
   };
 
+  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || errorStatus === null && recommendations === null && !loading;
+
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
       <Toaster />
@@ -59,7 +63,7 @@ export default function Home() {
           </h1>
         </div>
         <p className="font-body text-xl text-muted-foreground max-w-2xl animate-in fade-in slide-in-from-top duration-1000 delay-150">
-          Tu curador personal de cine. Describe un estado de ánimo, un género o un actor, y encontraremos tu próxima película favorita.
+          Tu recomendador de cine con IA. Describe qué te apetece ver y encontraremos tu próxima película favorita.
         </p>
 
         {/* Search Input Container */}
@@ -68,7 +72,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-primary/20 blur-2xl group-focus-within:bg-accent/20 transition-colors duration-500 rounded-full -z-10" />
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border shadow-2xl focus-within:border-primary/50 transition-all duration-300">
               <Input
-                placeholder="¿Qué te apetece ver? (ej. 'Acción con Tom Cruise')"
+                placeholder="¿Qué te apetece ver? (ej. 'Acción futurista')"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50 px-6"
@@ -85,39 +89,15 @@ export default function Home() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-accent" />
-                    Buscar Películas
+                    Buscar
                   </>
                 )}
               </Button>
             </div>
           </form>
           
-          {/* Error Alert for Config Issues */}
-          {errorStatus?.includes('CONFIG_ERROR') && (
-            <Alert variant="destructive" className="mt-6 text-left border-destructive/50 bg-destructive/10">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Configuración Requerida</AlertTitle>
-              <AlertDescription className="space-y-3">
-                <p>Para que ReelRecs funcione, necesitas añadir una <strong>Gemini API Key</strong>.</p>
-                <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                  <a 
-                    href="https://aistudio.google.com/app/apikey" 
-                    target="_blank" 
-                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-                  >
-                    Obtener API Key Gratis <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <p className="text-xs text-muted-foreground flex items-center italic">
-                    Pégala en tu archivo .env como GOOGLE_GENAI_API_KEY
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <span className="text-sm text-muted-foreground">Sugerencias:</span>
-            {['Thrillers neo-noir', 'Vibras de Wes Anderson', 'Comedias románticas de los 90'].map((suggestion) => (
+            {['Thrillers de espías', 'Vibras de verano', 'Ciencia ficción clásica'].map((suggestion) => (
               <button
                 key={suggestion}
                 onClick={() => setPreferences(suggestion)}
@@ -130,15 +110,41 @@ export default function Home() {
         </section>
       </header>
 
+      {/* Configuration Guide (Visible if there's no data or an error) */}
+      {(errorStatus?.includes('CONFIG_ERROR') || (recommendations === null && !loading)) && (
+        <section className="w-full max-w-2xl px-6 mb-12 animate-in fade-in duration-700 delay-500">
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <Key className="w-5 h-5" />
+                ¿Cómo activar ReelRecs?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-left">
+              <p className="text-sm text-muted-foreground">
+                Para que la IA funcione, necesitamos conectarla con Google. Sigue estos 3 pasos rápidos:
+              </p>
+              <ol className="list-decimal list-inside space-y-2 text-sm">
+                <li>
+                  Haz clic aquí para 
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary font-bold hover:underline mx-1 inline-flex items-center gap-1">
+                    obtener tu API Key <ExternalLink className="w-3 h-3" />
+                  </a> 
+                  (es gratis).
+                </li>
+                <li>Copia el código que te den (empieza por "AIza...").</li>
+                <li>Abre el archivo <b>.env</b> a la izquierda de tu pantalla y pégalo ahí.</li>
+              </ol>
+              <div className="p-3 bg-card rounded-md border text-xs font-mono text-muted-foreground break-all">
+                GOOGLE_GENAI_API_KEY=tu_clave_aqui
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {/* Results Section */}
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
-        {!recommendations && !loading && !errorStatus && (
-          <div className="flex flex-col items-center justify-center pt-20 text-center text-muted-foreground opacity-40 animate-in fade-in duration-1000">
-            <Clapperboard className="w-24 h-24 mb-6 stroke-1" />
-            <p className="text-lg italic font-headline">Tu viaje cinematográfico comienza aquí...</p>
-          </div>
-        )}
-
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
             {[1, 2, 3].map((i) => (
@@ -158,11 +164,8 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="font-headline text-3xl font-bold flex items-center gap-3">
                 <Search className="w-6 h-6 text-primary" />
-                Selección para ti
+                Recomendaciones para ti
               </h2>
-              <span className="text-muted-foreground text-sm uppercase tracking-widest bg-secondary/30 px-3 py-1 rounded-lg">
-                {recommendations.movies.length} Resultados
-              </span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
