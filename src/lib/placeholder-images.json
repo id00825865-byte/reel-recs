@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-bg",
+      "description": "A dark cinematic atmosphere with soft lighting",
+      "imageUrl": "https://picsum.photos/seed/reelrecs-hero/1920/1080",
+      "imageHint": "cinematic dark"
+    },
+    {
+      "id": "empty-state",
+      "description": "A minimalist film reel icon",
+      "imageUrl": "https://picsum.photos/seed/reelrecs-empty/800/600",
+      "imageHint": "film reel"
+    }
+  ]
 }
