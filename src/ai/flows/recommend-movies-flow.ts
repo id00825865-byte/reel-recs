@@ -37,7 +37,7 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
   try {
     const keyToUse = process.env.GOOGLE_GENAI_API_KEY;
 
-    if (!keyToUse || keyToUse.includes('TU_CLAVE_AQUI')) {
+    if (!keyToUse || keyToUse.includes('TU_CLAVE_AQUI') || keyToUse.includes('PEGAR_AQUI')) {
       throw new Error('CONFIG_ERROR: El servidor no tiene configurada la clave API de Google Gemini.');
     }
 
@@ -62,8 +62,13 @@ const prompt = ai.definePrompt({
 
 For each movie:
 - Provide the title.
-- Provide a valid URL to a movie poster. Use URLs from trusted sources like m.media-amazon.com or image.tmdb.org.
-- If you are unsure of a real poster URL, use: https://picsum.photos/seed/{{title}}/600/900
+- Provide a direct, valid URL to the movie's official poster. 
+- Prioritize high-quality sources like:
+  * https://image.tmdb.org/t/p/w500/...
+  * https://m.media-amazon.com/images/M/...
+- CRITICAL: Ensure the URL ends in .jpg or .png.
+- If you cannot find a direct official poster URL that is 100% reliable, use the following placeholder which is guaranteed to work:
+  https://picsum.photos/seed/{{title}}/600/900
 - Provide a concise and engaging synopsis.
 - Provide the director and main cast.
 
