@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * REELRECS SECURITY RULES - PROTOTYPING PHASE
+     * 
+     * CORE PHILOSOPHY:
+     * This ruleset implements a strict path-based ownership model. Security is enforced by 
+     * leveraging the hierarchical structure of Firestore, ensuring that users can only access 
+     * and modify data within their own /{userId} tree.
+     * 
+     * DATA STRUCTURE:
+     * - /users/{userId}: Private user profiles.
+     * - /movies/{movieId}: Global public catalog of movies.
+     * - /users/{userId}/watchedMovies/{watchedMovieId}: Private subcollection for user history.
+     * 
+     * KEY SECURITY DECISIONS:
+     * 1. Authorization Independence: We use the authenticated user's UID directly in the 
+     *    document paths (e.g., /users/{userId}). This allows for fast, efficient rules 
+     *    without the need for expensive get() calls.
+     * 2. Structural Segregation: Public movie data is kept at the top level with open read 
+     *    access, while user-specific data is nested under the user's unique ID.
+     * 3. Relational Integrity: On creation of user-specific records, we force the client 
+     *    to include a 'userId' field that matches the path, ensuring the data remains 
+     *    consistent even if exported or queried in aggregate.
+     * 4. Prototyping Flexibility: While authorization is strictly enforced (who can write), 
+     *    the specific schema (what fields are written) is flexible to allow for rapid iteration.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    /** @description Checks if the request is from an authenticated user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** @description Checks if the provided ID matches the authenticated user's UID. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Combines ownership check with verification that the document exists. Used for updates/deletes. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for the User profile. Only the owner can view or modify their own profile.
+     * @path /users/{userId}
+     * @allow (create) request.auth.uid == 'user_123' to path /users/user_123 where data.id == 'user_123'
+     * @deny (list) Anonymous user attempting to list all users.
+     * @principle Self-Creation and Path-based Ownership.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      
+      allow create: if isOwner(userId) 
+                    && request.resource.data.id == userId;
+      
+      allow update: if isExistingOwner(userId) 
+                    && request.resource.data.id == resource.data.id;
+      
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Records of movies a user has watched. Strictly private to the user.
+       * @path /users/{userId}/watchedMovies/{watchedMovieId}
+       * @allow (create) User 'abc' adding a movie record to their own subcollection.
+       * @deny (update) User 'abc' trying to change the 'userId' field of an existing record.
+       * @principle Subcollection ownership via parent path parameter.
+       */
+      match /watchedMovies/{watchedMovieId} {
+        allow get, list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) 
+                      && request.resource.data.userId == userId;
+        
+        allow update: if isExistingOwner(userId) 
+                      && request.resource.data.userId == resource.data.userId;
+        
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Public movie catalog. Readable by everyone, write-protected.
+     * @path /movies/{movieId}
+     * @allow (get) Any user (including guest) viewing movie details.
+     * @deny (create) Any user attempting to add a new movie to the global catalog.
+     * @principle Public Read with Restricted Writes.
+     */
+    match /movies/{movieId} {
+      allow get, list: if true;
+
+      // CRITICAL: Cannot implement owner-only writes. The 'Movie' entity is missing an 'ownerId' or 'authorId' field.
+      // In this prototype, movies are assumed to be managed via Admin SDK or a manual process.
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+  }
+}

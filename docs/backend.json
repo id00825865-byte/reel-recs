@@ -1,0 +1,192 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the ReelRecs application, storing their profile information.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "A unique username chosen by the user for identification."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for account management.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "createdAt"
+      ]
+    },
+    "Movie": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Movie",
+      "type": "object",
+      "description": "Represents a movie with its core details, used for recommendations and display.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Movie entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "The official title of the movie."
+        },
+        "synopsis": {
+          "type": "string",
+          "description": "A brief summary or description of the movie's plot."
+        },
+        "director": {
+          "type": "string",
+          "description": "The name of the movie's primary director."
+        },
+        "actors": {
+          "type": "array",
+          "description": "A list of the main actors or key cast members in the movie.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "posterUrl": {
+          "type": "string",
+          "description": "URL to the movie's poster image.",
+          "format": "uri"
+        },
+        "genres": {
+          "type": "array",
+          "description": "A list of genres associated with the movie, useful for filtering and recommendations.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "releaseDate": {
+          "type": "string",
+          "description": "The theatrical release date of the movie.",
+          "format": "date"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "synopsis",
+        "director",
+        "actors",
+        "posterUrl",
+        "genres"
+      ]
+    },
+    "UserWatchedMovie": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserWatchedMovie",
+      "type": "object",
+      "description": "Represents a record of a user having watched a specific movie, linking users to their watched movie history. (Relationship: User N:N Movie)",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserWatchedMovie entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who watched the movie. (Relationship: User 1:N UserWatchedMovie)"
+        },
+        "movieId": {
+          "type": "string",
+          "description": "Reference to the Movie that was watched. (Relationship: Movie 1:N UserWatchedMovie)"
+        },
+        "watchedAt": {
+          "type": "string",
+          "description": "Timestamp when the user marked the movie as watched.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "movieId",
+        "watchedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information, accessible only by the owning user. This path structure ensures authorization independence by directly using the authenticated user's UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier (UID) of the user, matching `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/movies/{movieId}",
+        "definition": {
+          "entityName": "Movie",
+          "schema": {
+            "$ref": "#/backend/entities/Movie"
+          },
+          "description": "Contains global, publicly accessible details for each movie. This collection has a homogeneous security posture, allowing broad read access for recommendations.",
+          "params": [
+            {
+              "name": "movieId",
+              "description": "The unique identifier for the movie."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/watchedMovies/{watchedMovieId}",
+        "definition": {
+          "entityName": "UserWatchedMovie",
+          "schema": {
+            "$ref": "#/backend/entities/UserWatchedMovie"
+          },
+          "description": "Records movies that a specific user has marked as watched. This subcollection ensures that each user's watched list is private and directly owned by them, leveraging the `{userId}` in the path for authorization independence. Each document includes the `userId` and `movieId` for data integrity.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier (UID) of the user who watched the movie, matching `request.auth.uid`."
+            },
+            {
+              "name": "watchedMovieId",
+              "description": "The unique identifier for this specific watched movie record within the user's list (can be an auto-generated ID or a movieId if suitable)."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure for ReelRecs prioritizes Authorization Independence and Structural Segregation to ensure robust, debuggable security rules and efficient data access. The core principle applied is path-based ownership for user-specific data and global collections for public entities. User profiles are stored in a top-level collection `/users/{userId}`, where `{userId}` directly corresponds to the authenticated user's UID. This setup makes authorization trivial, as rules can directly compare `request.auth.uid` with the `{userId}` in the path, eliminating any need for `get()` calls to check parent document ownership. Movie data, which is global and publicly accessible, resides in a separate top-level collection `/movies/{movieId}`. This segregation ensures that all documents within `/movies` share the same public read security posture, simplifying rules.\n\nFor tracking watched movies, the `UserWatchedMovie` entity is implemented as a subcollection under each user's profile: `/users/{userId}/watchedMovies/{watchedMovieId}`. This design is crucial for Authorization Independence, as the `userId` is part of the path, allowing rules to authorize `read` and `write` access by comparing `request.auth.uid` with the path's `userId`. This makes operations atomic and prevents security rule dependencies on parent document attributes. Each `UserWatchedMovie` document also contains `userId` and `movieId` for data integrity and easier querying if needed, but its security relies fundamentally on the path.\n\nRegarding QAPs (Rules are not Filters), this structure enables secure list operations. For `/movies`, a `list` query simply retrieves publicly available movie data, fulfilling the security requirements without server-side filtering. For `/users/{userId}/watchedMovies`, a `list` query made by an authenticated user to their own `watchedMovies` subcollection (`/users/request.auth.uid/watchedMovies`) will inherently return only their own watched movies, as the rules enforce that the `userId` in the path matches `request.auth.uid`. This design ensures that security rules explicitly define what data can be accessed, and `list` operations naturally adhere to these boundaries, rather than relying on rules to filter results after retrieval."
+  }
+}
