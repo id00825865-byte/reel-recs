@@ -5,8 +5,9 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, Clapperboard } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, Clapperboard, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
@@ -19,13 +20,15 @@ export default function Home() {
     if (!preferences.trim()) return;
 
     setLoading(true);
+    setRecommendations(null); // Limpiar resultados previos
+
     try {
       const results = await recommendMovies({ preferences });
       setRecommendations(results);
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Recommendation Error",
-        description: "We couldn't get your movie matches. Please try describing your mood again.",
+        title: "Error de conexión",
+        description: error.message || "No pudimos obtener tus recomendaciones. Revisa tu conexión o configuración.",
         variant: "destructive",
       });
     } finally {
@@ -35,6 +38,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
+      <Toaster />
       {/* Hero Section */}
       <header className="w-full max-w-7xl px-6 pt-16 pb-12 flex flex-col items-center text-center">
         <div className="flex items-center gap-3 mb-6 animate-in fade-in slide-in-from-top duration-700">
@@ -46,7 +50,7 @@ export default function Home() {
           </h1>
         </div>
         <p className="font-body text-xl text-muted-foreground max-w-2xl animate-in fade-in slide-in-from-top duration-1000 delay-150">
-          Your personal cinematic curator. Describe a mood, a genre, or an actor, and we'll find your next favorite film.
+          Tu curador personal de cine. Describe un estado de ánimo, un género o un actor, y encontraremos tu próxima película favorita.
         </p>
 
         {/* Search Input Container */}
@@ -55,7 +59,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-primary/20 blur-2xl group-focus-within:bg-accent/20 transition-colors duration-500 rounded-full -z-10" />
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border shadow-2xl focus-within:border-primary/50 transition-all duration-300">
               <Input
-                placeholder="What are you in the mood for? (e.g., 'Action movies with Tom Cruise' or 'Something like Inception')"
+                placeholder="¿Qué te apetece ver? (ej. 'Acción con Tom Cruise' o 'Algo como Inception')"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50 px-6"
@@ -72,15 +76,15 @@ export default function Home() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-accent" />
-                    Find Movies
+                    Buscar Películas
                   </>
                 )}
               </Button>
             </div>
           </form>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <span className="text-sm text-muted-foreground">Try:</span>
-            {['Neo-noir thrillers', 'Wes Anderson vibes', '90s Rom-Coms', 'Space exploration'].map((suggestion) => (
+            <span className="text-sm text-muted-foreground">Sugerencias:</span>
+            {['Thrillers neo-noir', 'Vibras de Wes Anderson', 'Comedias románticas de los 90', 'Exploración espacial'].map((suggestion) => (
               <button
                 key={suggestion}
                 onClick={() => setPreferences(suggestion)}
@@ -98,7 +102,7 @@ export default function Home() {
         {!recommendations && !loading && (
           <div className="flex flex-col items-center justify-center pt-20 text-center text-muted-foreground opacity-40 animate-in fade-in duration-1000">
             <Clapperboard className="w-24 h-24 mb-6 stroke-1" />
-            <p className="text-lg italic font-headline">Your cinematic journey begins here...</p>
+            <p className="text-lg italic font-headline">Tu viaje cinematográfico comienza aquí...</p>
           </div>
         )}
 
@@ -122,10 +126,10 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="font-headline text-3xl font-bold flex items-center gap-3">
                 <Search className="w-6 h-6 text-primary" />
-                Curated Picks for You
+                Selección para ti
               </h2>
               <span className="text-muted-foreground text-sm uppercase tracking-widest bg-secondary/30 px-3 py-1 rounded-lg">
-                {recommendations.movies.length} Results
+                {recommendations.movies.length} Resultados
               </span>
             </div>
             
@@ -140,7 +144,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="w-full py-8 border-t border-border/50 text-center text-muted-foreground text-sm">
-        <p>© {new Date().getFullYear()} ReelRecs. Powered by AI for Cinephiles.</p>
+        <p>© {new Date().getFullYear()} ReelRecs. IA para cinéfilos.</p>
       </footer>
     </main>
   );
