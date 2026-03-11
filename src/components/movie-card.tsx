@@ -2,13 +2,13 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, UserSquare2, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Star } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { RatingStars } from '@/components/rating-stars';
 
@@ -31,23 +31,26 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
   const { user } = useUser();
   const db = useFirestore();
 
-  const watchedMovieId = encodeURIComponent(movie.title.toLowerCase());
-  const watchlistId = encodeURIComponent(movie.title.toLowerCase());
+  // Generar un ID estable basado en el título para evitar duplicados por mayúsculas
+  const stableId = useMemo(() => 
+    encodeURIComponent(movie.title.toLowerCase().trim()), 
+    [movie.title]
+  );
 
   const handleMarkAsWatched = (rating: number = 0) => {
     if (!user || !db) return;
-    const docRef = doc(db, 'users', user.uid, 'watchedMovies', watchedMovieId);
+    const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
-    // Al marcar como vista, también la quitamos de la lista de "por ver"
+    // Si la calificamos o marcamos, la quitamos de la lista de deseos
     if (isInWatchlist) {
-      const watchlistRef = doc(db, 'users', user.uid, 'watchlist', watchlistId);
+      const watchlistRef = doc(db, 'users', user.uid, 'watchlist', stableId);
       deleteDocumentNonBlocking(watchlistRef);
     }
 
     setDocumentNonBlocking(docRef, {
-      id: watchedMovieId,
+      id: stableId,
       userId: user.uid,
-      movieId: watchedMovieId,
+      movieId: stableId,
       title: movie.title,
       posterUrl: movie.posterUrl,
       watchedAt: new Date().toISOString(),
@@ -57,13 +60,13 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
 
   const handleToggleWatchlist = () => {
     if (!user || !db) return;
-    const docRef = doc(db, 'users', user.uid, 'watchlist', watchlistId);
+    const docRef = doc(db, 'users', user.uid, 'watchlist', stableId);
     
     if (isInWatchlist) {
       deleteDocumentNonBlocking(docRef);
     } else {
       setDocumentNonBlocking(docRef, {
-        id: watchlistId,
+        id: stableId,
         userId: user.uid,
         title: movie.title,
         posterUrl: movie.posterUrl,
@@ -72,7 +75,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     }
   };
 
-  const fallbackUrl = `https://picsum.photos/seed/${encodeURIComponent(movie.title)}/600/900`;
+  const fallbackUrl = `https://picsum.photos/seed/${stableId}/600/900`;
 
   return (
     <Card 

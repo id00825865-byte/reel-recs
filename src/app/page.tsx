@@ -32,7 +32,9 @@ export default function Home() {
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
-  const watchedTitles = watchedMovies?.map(m => m.title) || [];
+  
+  // Normalizar títulos para comparaciones insensibles a mayúsculas
+  const watchedTitlesLower = watchedMovies?.map(m => m.title.toLowerCase()) || [];
 
   // Suscribirse a lista de deseos
   const watchlistQuery = useMemoFirebase(() => {
@@ -40,7 +42,7 @@ export default function Home() {
     return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
-  const watchlistTitles = watchlistMovies?.map(m => m.title) || [];
+  const watchlistTitlesLower = watchlistMovies?.map(m => m.title.toLowerCase()) || [];
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +54,7 @@ export default function Home() {
     try {
       const results = await recommendMovies({ 
         preferences,
-        excludeMovies: watchedTitles 
+        excludeMovies: watchedMovies?.map(m => m.title) || [] 
       });
       setRecommendations(results);
       setActiveTab('explore');
@@ -173,8 +175,8 @@ export default function Home() {
                     key={`${movie.title}-${idx}`} 
                     movie={movie} 
                     index={idx}
-                    isWatched={watchedTitles.includes(movie.title)}
-                    isInWatchlist={watchlistTitles.includes(movie.title)}
+                    isWatched={watchedTitlesLower.includes(movie.title.toLowerCase())}
+                    isInWatchlist={watchlistTitlesLower.includes(movie.title.toLowerCase())}
                   />
                 ))}
               </div>
