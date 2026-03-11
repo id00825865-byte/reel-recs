@@ -14,6 +14,9 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '
 import { collection, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
+// Función para generar un ID estable y limpio
+const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
+
 export default function Home() {
   const [preferences, setPreferences] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,16 +35,17 @@ export default function Home() {
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
-  // Mapa de calificaciones para acceso rápido
+  // Mapa de calificaciones para acceso rápido (usando ID estable)
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
-      map[m.title.toLowerCase().trim()] = m.rating || 0;
+      const id = getStableId(m.title);
+      map[id] = m.rating || 0;
     });
     return map;
   }, [watchedMovies]);
 
-  const watchedTitlesLower = useMemo(() => Object.keys(watchedRatingsMap), [watchedRatingsMap]);
+  const watchedIds = useMemo(() => Object.keys(watchedRatingsMap), [watchedRatingsMap]);
 
   // Suscribirse a lista de deseos
   const watchlistQuery = useMemoFirebase(() => {
@@ -49,7 +53,7 @@ export default function Home() {
     return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
-  const watchlistTitlesLower = useMemo(() => watchlistMovies?.map(m => m.title.toLowerCase().trim()) || [], [watchlistMovies]);
+  const watchlistIds = useMemo(() => watchlistMovies?.map(m => getStableId(m.title)) || [], [watchlistMovies]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,17 +211,17 @@ export default function Home() {
             ) : recommendations ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {recommendations.movies.map((movie, idx) => {
-                  const titleKey = movie.title.toLowerCase().trim();
+                  const titleId = getStableId(movie.title);
                   return (
                     <MovieCard 
-                      key={`${movie.title}-${idx}`} 
+                      key={titleId} 
                       movie={{
                         ...movie,
-                        rating: watchedRatingsMap[titleKey] || 0
+                        rating: watchedRatingsMap[titleId] || 0
                       }} 
                       index={idx}
-                      isWatched={watchedTitlesLower.includes(titleKey)}
-                      isInWatchlist={watchlistTitlesLower.includes(titleKey)}
+                      isWatched={watchedIds.includes(titleId)}
+                      isInWatchlist={watchlistIds.includes(titleId)}
                     />
                   );
                 })}

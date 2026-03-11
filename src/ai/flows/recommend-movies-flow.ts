@@ -54,20 +54,18 @@ STRICT EXCLUSION LIST (Do NOT recommend these):
 {{/if}}
 
 STRICT INSTRUCTIONS FOR POSTERS:
-1. You MUST provide the REAL official poster URL.
-2. The preferred format is TMDB (image.tmdb.org).
-3. TMDB URLs follow this structure: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-4. Use your internal training data to recall the exact <POSTER_ID> for the movies.
-   Examples of REAL paths you MUST emulate:
+1. You MUST provide the REAL official poster URL from TMDB.
+2. TMDB URLs follow this structure: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+3. Use your knowledge to find the correct <POSTER_ID> for the movies.
+   Examples of REAL paths you MUST follow:
    - "Titanic": https://image.tmdb.org/t/p/w500/9xj7r4Rfsar1H879t8rS6YpU8R7.jpg
    - "The Dark Knight": https://image.tmdb.org/t/p/w500/qJ2tW6WMUDp9sUNvS68PkH29Sih.jpg
-   - "Shrek": https://image.tmdb.org/t/p/w500/iB6sRJim6vSqiZpIBZRh6pS9S6S.jpg
-   - "The Matrix": https://image.tmdb.org/t/p/w500/f89U3Y9L3vSqiZpIBZRh6pS9S6S.jpg
+   - "Inception": https://image.tmdb.org/t/p/w500/9gk7RjU0Zwqy3STuG49ubS19qD6.jpg
+   - "Pulp Fiction": https://image.tmdb.org/t/p/w500/d5iIl9h9btztU0kzUvY7Yqh07YI.jpg
 
-5. If a TMDB ID is unknown to you, use an IMDb CDN URL (m.media-amazon.com).
-6. NEVER use generic search URLs or placeholder sites like Picsum or Unsplash.
-7. NEVER invent IDs. If you don't have a specific ID, try a direct link from Amazon images for that movie title.
-8. Every single posterUrl must lead directly to a .jpg or .png file of the ACTUAL movie poster.`,
+4. NEVER invent IDs. If you are unsure of the TMDB ID, use a direct IMDb CDN URL (m.media-amazon.com).
+5. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.
+6. NO placeholders, NO picsum, NO unsplash.`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
