@@ -5,24 +5,28 @@ import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommen
 import { MovieCard } from '@/components/movie-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Film, Search, Loader2, Sparkles, Key, HelpCircle, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, Key, ExternalLink, ShieldCheck, Settings2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
   const [manualKey, setManualKey] = useState('');
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendMoviesOutput | null>(null);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Intentar cargar la clave desde localStorage al inicio
+  // Cargar la clave desde localStorage al inicio
   useEffect(() => {
     const savedKey = localStorage.getItem('recrecs_api_key');
-    if (savedKey) setManualKey(savedKey);
+    if (savedKey) {
+      setManualKey(savedKey);
+    } else {
+      setShowKeyConfig(true);
+    }
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -34,7 +38,7 @@ export default function Home() {
     setErrorStatus(null);
 
     try {
-      // Guardar la clave manualmente si se introduce
+      // Guardar la clave si se ha modificado
       if (manualKey) {
         localStorage.setItem('recrecs_api_key', manualKey);
       }
@@ -44,15 +48,20 @@ export default function Home() {
         apiKey: manualKey 
       });
       setRecommendations(results);
+      setShowKeyConfig(false); // Ocultar config si funciona
     } catch (error: any) {
       const msg = error.message || "";
       setErrorStatus(msg);
       
+      if (msg.includes('CONFIG_ERROR')) {
+        setShowKeyConfig(true);
+      }
+
       toast({
         title: "Error en la búsqueda",
         description: msg.includes('CONFIG_ERROR') 
-          ? "Falta la clave API o es inválida." 
-          : "No pudimos obtener recomendaciones.",
+          ? "La clave API parece no ser válida." 
+          : "No pudimos obtener recomendaciones. Inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -60,13 +69,20 @@ export default function Home() {
     }
   };
 
-  const isConfigError = errorStatus?.includes('CONFIG_ERROR') || (!manualKey && recommendations === null && !loading);
+  const clearKey = () => {
+    localStorage.removeItem('recrecs_api_key');
+    setManualKey('');
+    setShowKeyConfig(true);
+    toast({
+      description: "Clave API eliminada correctamente.",
+    });
+  };
 
   return (
     <main className="min-h-screen bg-background selection:bg-accent/30 flex flex-col items-center">
       <Toaster />
       
-      <header className="w-full max-w-7xl px-6 pt-16 pb-8 flex flex-col items-center text-center">
+      <header className="w-full max-w-7xl px-6 pt-12 pb-8 flex flex-col items-center text-center">
         <div className="flex items-center gap-3 mb-6 animate-in fade-in slide-in-from-top duration-700">
           <div className="p-3 rounded-full bg-primary/20 text-primary border border-primary/20">
             <Film className="w-8 h-8" />
@@ -75,47 +91,77 @@ export default function Home() {
             Reel<span className="text-primary">Recs</span>
           </h1>
         </div>
-        <p className="font-body text-xl text-muted-foreground max-w-2xl">
+        <p className="font-body text-xl text-muted-foreground max-w-2xl mb-8">
           Tu recomendador de cine con IA. Describe qué te apetece ver y encontraremos tu próxima película favorita.
         </p>
 
-        {/* Sección de Clave API (Solo si no hay una clave guardada o hay error) */}
-        {isConfigError && (
-          <section className="w-full max-w-xl mt-8 animate-in zoom-in duration-500">
-            <Card className="border-accent/40 bg-accent/5">
+        {/* Botón de Ajustes de Clave (Solo si ya hay una guardada y no se está mostrando el panel) */}
+        {!showKeyConfig && manualKey && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowKeyConfig(true)}
+            className="mb-4 text-muted-foreground hover:text-foreground gap-2"
+          >
+            <Settings2 className="w-4 h-4" />
+            Configuración de Clave API
+          </Button>
+        )}
+
+        {/* Sección de Clave API */}
+        {showKeyConfig && (
+          <section className="w-full max-w-xl mt-4 mb-8 animate-in zoom-in duration-300">
+            <Card className="border-accent/40 bg-accent/5 relative overflow-hidden">
+              <button 
+                onClick={() => setShowKeyConfig(false)}
+                className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-accent">
                   <Key className="w-4 h-4" />
-                  Paso Final: Pega tu código aquí
+                  Configura tu acceso a Gemini
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     placeholder="Pega aquí tu código AIza..."
                     value={manualKey}
                     onChange={(e) => setManualKey(e.target.value)}
-                    className="bg-background border-accent/20 focus-visible:ring-accent"
+                    className="flex-1 bg-background border-accent/20 focus-visible:ring-accent"
+                    type="password"
                   />
+                  <Button onClick={() => setShowKeyConfig(false)} variant="secondary" className="px-6">
+                    Listo
+                  </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground text-left">
-                  Si no tienes el código, consíguelo gratis en 
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary hover:underline ml-1 inline-flex items-center gap-0.5">
-                    Google AI Studio <ExternalLink className="w-2 h-2" />
-                  </a> 
-                  usando el botón <b>"Create API key in new project"</b>.
-                </p>
+                <div className="flex flex-col gap-2 text-left">
+                  <p className="text-[10px] text-muted-foreground">
+                    Consíguelo gratis en 
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-primary hover:underline ml-1 inline-flex items-center gap-0.5">
+                      Google AI Studio <ExternalLink className="w-2 h-2" />
+                    </a> 
+                    con <b>"Create API key in new project"</b>.
+                  </p>
+                  {manualKey && (
+                    <button onClick={clearKey} className="text-[10px] text-destructive hover:underline text-left w-fit">
+                      Borrar clave guardada
+                    </button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </section>
         )}
 
-        {/* Search Input Container */}
-        <section className="w-full max-w-3xl mt-10">
+        {/* Buscador */}
+        <section className="w-full max-w-3xl">
           <form onSubmit={handleSearch} className="relative group">
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border shadow-2xl focus-within:border-primary/50 transition-all duration-300">
               <Input
-                placeholder="¿Qué te apetece ver? (ej. 'Acción futurista')"
+                placeholder="¿Qué te apetece ver? (ej. 'Acción futurista con un toque retro')"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 px-6"
@@ -132,7 +178,7 @@ export default function Home() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-accent" />
-                    Buscar
+                    Encontrar Películas
                   </>
                 )}
               </Button>
@@ -141,7 +187,7 @@ export default function Home() {
         </section>
       </header>
 
-      {/* Results Section */}
+      {/* Resultados */}
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
@@ -169,7 +215,7 @@ export default function Home() {
       <footer className="w-full py-8 border-t border-border/50 text-center text-muted-foreground text-xs flex flex-col items-center gap-2">
         <div className="flex items-center gap-1 text-green-500/70">
           <ShieldCheck className="w-3 h-3" />
-          Tu clave se guarda solo en este navegador.
+          Clave guardada localmente de forma segura.
         </div>
         <p>© {new Date().getFullYear()} ReelRecs. IA para cinéfilos.</p>
       </footer>
