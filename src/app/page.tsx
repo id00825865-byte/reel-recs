@@ -109,7 +109,7 @@ export default function Home() {
         </section>
       </header>
 
-      {/* Configuration Guide (Only visible if there is an error or no recommendations yet) */}
+      {/* Configuration Guide */}
       {isConfigError && (
         <section className="w-full max-w-2xl px-6 mb-12 animate-in fade-in duration-700 delay-500">
           <Card className="border-primary/20 bg-primary/5">
@@ -136,10 +136,10 @@ export default function Home() {
                   <div className="bg-primary/10 text-primary font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">2</div>
                   <div className="space-y-2">
                     <p className="text-sm">
-                      Busca el archivo <b className="inline-flex items-center gap-1 text-primary"><FileCode className="w-4 h-4" /> .env</b> en la lista de archivos a la izquierda (está al final).
+                      Busca el archivo <b className="inline-flex items-center gap-1 text-primary"><FileCode className="w-4 h-4" /> .env</b> en la lista de la izquierda (está al final).
                     </p>
                     <div className="p-2 bg-background/50 rounded border border-dashed border-primary/20">
-                      <p className="text-[10px] text-muted-foreground italic">Pista: Está justo encima de package.json</p>
+                      <p className="text-[10px] text-muted-foreground italic">Pista: Haz clic en el archivo .env en la columna de archivos.</p>
                     </div>
                   </div>
                 </div>
