@@ -22,7 +22,7 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
-        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB preferred).'),
+        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB w500 preferred).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         director: z.string().describe('The name of the movie\'s director.'),
         actors: z.array(z.string()).describe('A list of the main actors.'),
@@ -42,7 +42,7 @@ const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie librarian.
+  prompt: `You are an expert movie librarian with access to a massive internal database of film metadata.
 
 USER PREFERENCES: {{{preferences}}}
 
@@ -54,14 +54,18 @@ CRITICAL: The user has already watched the following movies. You MUST NOT recomm
 {{/if}}
 
 INSTRUCTIONS:
-1. Provide unique and high-quality recommendations.
+1. Provide unique and high-quality recommendations that fit the user's mood and preferences.
 2. For each movie, you MUST provide the REAL official poster URL from TMDB (The Movie Database).
-   TMDB URLs follow this pattern: https://image.tmdb.org/t/p/w600_and_h900_bestv2/<poster_path>.jpg
-   Example for "The Godfather": https://image.tmdb.org/t/p/w600_and_h900_bestv2/3bhkrj06YpU8R7pS69YpU8R7pS6.jpg
-   Example for "The Matrix": https://image.tmdb.org/t/p/w600_and_h900_bestv2/f89U3Y9L7dbptvTMRccp9zKIpaX.jpg
-3. SEARCH for the specific poster_path for each movie. Do NOT hallucinate URLs that don't exist.
-4. If TMDB is absolutely unavailable, use a high-quality official poster from m.media-amazon.com.
-5. ONLY if the movie is extremely obscure or non-existent (which shouldn't happen), you may use a high-quality placeholder from Unsplash or Picsum, but this is a last resort.`,
+   TMDB URLs follow this EXACT pattern: https://image.tmdb.org/t/p/w500/<poster_path>.jpg
+   Examples:
+   - "The Godfather": https://image.tmdb.org/t/p/w500/3bhkrj06YpU8R7pS69YpU8R7pS6.jpg
+   - "Pulp Fiction": https://image.tmdb.org/t/p/w500/fIE33gaGEuSMvpk77qvZIB66v0X.jpg
+   - "The Shawshank Redemption": https://image.tmdb.org/t/p/w500/9cq363Z9R69MDTk999p3mG6P25w.jpg
+   - "Inception": https://image.tmdb.org/t/p/w500/9gk7698LqllRzCqWpQDqK6P3qIn.jpg
+   - "The Dark Knight": https://image.tmdb.org/t/p/w500/qJ2tW6WMUDp9QmSJJhUvIS6o30k.jpg
+3. Use your internal knowledge to retrieve the EXACT poster_path for these and any other films. Do NOT hallucinate random characters.
+4. DO NOT use placeholder images like Picsum, Unsplash, or generic "movie" search results.
+5. If TMDB is unavailable, use a high-quality direct link from Amazon (m.media-amazon.com).`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(

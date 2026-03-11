@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -6,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, ImageOff } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -75,7 +74,14 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     }
   };
 
-  const fallbackUrl = `https://picsum.photos/seed/${stableId}/600/900`;
+  const fallbackUI = (
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-secondary/40 border-b border-border/10">
+      <Clapperboard className="w-12 h-12 text-primary/30 mb-4" />
+      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Cartel oficial</span>
+      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">No disponible</span>
+      <span className="text-lg font-headline font-bold text-primary leading-tight">{movie.title}</span>
+    </div>
+  );
 
   return (
     <Card 
@@ -83,15 +89,18 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className="aspect-[2/3] relative w-full overflow-hidden bg-muted">
-        <Image
-          src={hasError ? fallbackUrl : movie.posterUrl}
-          alt={movie.title}
-          fill
-          className={`object-cover transition-all duration-500 ${hasError ? 'grayscale opacity-50' : 'group-hover:scale-105'}`}
-          unoptimized
-          onError={() => setHasError(true)}
-          data-ai-hint="movie poster"
-        />
+        {hasError ? (
+          fallbackUI
+        ) : (
+          <Image
+            src={movie.posterUrl}
+            alt={movie.title}
+            fill
+            className="object-cover transition-all duration-500 group-hover:scale-105"
+            unoptimized
+            onError={() => setHasError(true)}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
         
         <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
