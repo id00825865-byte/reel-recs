@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -8,7 +7,7 @@ import { AuthForm } from '@/components/auth-form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
@@ -81,6 +80,32 @@ export default function Home() {
     signOut(auth);
   };
 
+  const handleExportData = () => {
+    if (!user) return;
+    
+    const dataToExport = {
+      user: user.email,
+      watchedMovies: watchedMovies || [],
+      watchlist: watchlistMovies || [],
+      exportedAt: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ReelRecs-Backup-${user.email}-${new Date().toLocaleDateString()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Respaldo generado",
+      description: "Tus datos se han guardado en un archivo JSON local.",
+    });
+  };
+
   if (isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -117,7 +142,10 @@ export default function Home() {
             <UserIcon className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">{user.email}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:text-destructive">
+          <Button variant="ghost" size="icon" onClick={handleExportData} title="Descargar respaldo local" className="hover:text-primary">
+            <Download className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className="hover:text-destructive">
             <LogOut className="w-5 h-5" />
           </Button>
         </div>

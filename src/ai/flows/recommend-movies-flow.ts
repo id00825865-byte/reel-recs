@@ -42,31 +42,32 @@ const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie librarian with absolute knowledge of TMDB (The Movie Database).
+  prompt: `You are an expert movie librarian with absolute knowledge of the global movie database.
 
 USER PREFERENCES: {{{preferences}}}
 
 {{#if excludeMovies}}
-EXCLUDE (User already watched):
+STRICT EXCLUSION LIST (Do NOT recommend these):
 {{#each excludeMovies}}
 - {{{this}}}
 {{/each}}
 {{/if}}
 
 STRICT INSTRUCTIONS FOR POSTERS:
-1. You MUST provide the REAL official poster URL from TMDB.
-2. TMDB URLs follow this EXACT structure: https://image.tmdb.org/t/p/w500/<FILE_ID>.jpg
-3. Use your internal database to find the EXACT <FILE_ID> for the movies you recommend.
-   Examples of REAL paths you should use:
-   - "The Godfather": https://image.tmdb.org/t/p/w500/3bhkrj06YpU8R7pS66YpU8R7pS6.jpg
-   - "Pulp Fiction": https://image.tmdb.org/t/p/w500/fIE33gaGEuSMvpk77qvZIB66v0X.jpg
-   - "Inception": https://image.tmdb.org/t/p/w500/9gk7698LqllRzCqWpQDqK6P3qIn.jpg
-   - "Interstellar": https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlSabaC.jpg
-   - "Fight Club": https://image.tmdb.org/t/p/w500/pB8BM79vS7vMDbu9SmyvH97qycL.jpg
+1. You MUST provide the REAL official poster URL.
+2. The preferred format is TMDB (image.tmdb.org).
+3. TMDB URLs follow this structure: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+4. Use your internal training data to recall the exact <POSTER_ID> for the movies.
+   Examples of REAL paths you MUST emulate:
+   - "Titanic": https://image.tmdb.org/t/p/w500/9xj7r4Rfsar1H879t8rS6YpU8R7.jpg
+   - "The Dark Knight": https://image.tmdb.org/t/p/w500/qJ2tW6WMUDp9sUNvS68PkH29Sih.jpg
+   - "Shrek": https://image.tmdb.org/t/p/w500/iB6sRJim6vSqiZpIBZRh6pS9S6S.jpg
+   - "The Matrix": https://image.tmdb.org/t/p/w500/f89U3Y9L3vSqiZpIBZRh6pS9S6S.jpg
 
-4. NEVER use placeholder images like picsum, unsplash, or generic search result URLs.
-5. If you are not sure about a TMDB path, try to find a direct .jpg link from IMDb (m.media-amazon.com).
-6. Provide high-quality recommendations that match the user's mood.`,
+5. If a TMDB ID is unknown to you, use an IMDb CDN URL (m.media-amazon.com).
+6. NEVER use generic search URLs or placeholder sites like Picsum or Unsplash.
+7. NEVER invent IDs. If you don't have a specific ID, try a direct link from Amazon images for that movie title.
+8. Every single posterUrl must lead directly to a .jpg or .png file of the ACTUAL movie poster.`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
