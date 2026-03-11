@@ -53,7 +53,6 @@ export default function Home() {
           Encuentra tu próxima película favorita con Inteligencia Artificial.
         </p>
 
-        {/* Buscador Principal - Ahora es lo único que ve el usuario */}
         <section className="w-full max-w-3xl">
           <form onSubmit={handleSearch} className="relative group">
             <div className="relative flex flex-col md:flex-row gap-4 p-3 bg-card rounded-3xl border border-border/50 shadow-[0_20px_50px_rgba(0,0,0,0.3)] focus-within:border-primary/50 focus-within:shadow-primary/5 transition-all duration-500">
