@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommend-movies-flow';
 import { MovieCard } from '@/components/movie-card';
 import { AuthForm } from '@/components/auth-form';
@@ -33,8 +33,16 @@ export default function Home() {
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
-  // Normalizar títulos para comparaciones insensibles a mayúsculas
-  const watchedTitlesLower = watchedMovies?.map(m => m.title.toLowerCase()) || [];
+  // Mapa de calificaciones para acceso rápido
+  const watchedRatingsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    watchedMovies?.forEach(m => {
+      map[m.title.toLowerCase().trim()] = m.rating || 0;
+    });
+    return map;
+  }, [watchedMovies]);
+
+  const watchedTitlesLower = useMemo(() => Object.keys(watchedRatingsMap), [watchedRatingsMap]);
 
   // Suscribirse a lista de deseos
   const watchlistQuery = useMemoFirebase(() => {
@@ -42,7 +50,7 @@ export default function Home() {
     return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
-  const watchlistTitlesLower = watchlistMovies?.map(m => m.title.toLowerCase()) || [];
+  const watchlistTitlesLower = useMemo(() => watchlistMovies?.map(m => m.title.toLowerCase().trim()) || [], [watchlistMovies]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,15 +178,21 @@ export default function Home() {
               </div>
             ) : recommendations ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {recommendations.movies.map((movie, idx) => (
-                  <MovieCard 
-                    key={`${movie.title}-${idx}`} 
-                    movie={movie} 
-                    index={idx}
-                    isWatched={watchedTitlesLower.includes(movie.title.toLowerCase())}
-                    isInWatchlist={watchlistTitlesLower.includes(movie.title.toLowerCase())}
-                  />
-                ))}
+                {recommendations.movies.map((movie, idx) => {
+                  const titleKey = movie.title.toLowerCase().trim();
+                  return (
+                    <MovieCard 
+                      key={`${movie.title}-${idx}`} 
+                      movie={{
+                        ...movie,
+                        rating: watchedRatingsMap[titleKey] || 0
+                      }} 
+                      index={idx}
+                      isWatched={watchedTitlesLower.includes(titleKey)}
+                      isInWatchlist={watchlistTitlesLower.includes(titleKey)}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">

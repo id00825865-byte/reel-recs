@@ -3,7 +3,7 @@
 
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface RatingStarsProps {
   rating: number;
@@ -13,8 +13,14 @@ interface RatingStarsProps {
 
 export function RatingStars({ rating, onRatingChange, interactive = false }: RatingStarsProps) {
   const [hoverRating, setHoverRating] = useState(0);
+  const [localRating, setLocalRating] = useState(rating);
 
-  const displayRating = hoverRating || rating;
+  // Sincronizar el estado local con el prop cuando cambie el dato real de la base de datos
+  useEffect(() => {
+    setLocalRating(rating);
+  }, [rating]);
+
+  const displayRating = hoverRating || localRating;
 
   return (
     <div className="flex gap-1" onMouseLeave={() => setHoverRating(0)}>
@@ -28,6 +34,7 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
             e.preventDefault();
             e.stopPropagation();
             if (interactive && onRatingChange) {
+              setLocalRating(star); // Feedback visual instantáneo
               onRatingChange(star);
             }
           }}
