@@ -14,7 +14,6 @@ const RecommendMoviesInputSchema = z.object({
   preferences: z
     .string()
     .describe('The user\'s natural language description of movie preferences (e.g., genres, actors, mood, similar movies).'),
-  apiKey: z.string().optional().describe('Optional manual API key provided by the user.'),
 });
 export type RecommendMoviesInput = z.infer<typeof RecommendMoviesInputSchema>;
 
@@ -36,29 +35,22 @@ export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
 export async function recommendMovies(input: RecommendMoviesInput): Promise<RecommendMoviesOutput> {
   try {
-    const keyToUse = input.apiKey || process.env.GOOGLE_GENAI_API_KEY;
+    const keyToUse = process.env.GOOGLE_GENAI_API_KEY;
 
-    if (!keyToUse || keyToUse === 'TU_CLAVE_AQUI' || keyToUse === 'PEGAR_AQUI_TU_CODIGO_AIza') {
-      throw new Error('MISSING_API_KEY');
-    }
-
-    // Configurar la API Key dinámicamente si se proporciona manualmente
-    // Nota: En un entorno real de Genkit, esto se manejaría mediante el plugin,
-    // aquí asumimos que el entorno o el input proporcionan la clave válida.
-    if (input.apiKey) {
-      process.env.GOOGLE_GENAI_API_KEY = input.apiKey;
+    if (!keyToUse || keyToUse.includes('TU_CLAVE_AQUI')) {
+      throw new Error('CONFIG_ERROR: El servidor no tiene configurada la clave API de Google Gemini.');
     }
 
     const result = await recommendMoviesFlow(input);
     return result;
   } catch (error: any) {
-    console.error('Error detallado en recommendMovies:', error);
+    console.error('Error en recommendMovies:', error);
     
-    if (error.message === 'MISSING_API_KEY' || error.message?.includes('API_KEY_INVALID') || error.message?.includes('403')) {
-      throw new Error('CONFIG_ERROR: No se encontró una clave API válida.');
+    if (error.message?.includes('CONFIG_ERROR')) {
+      throw new Error('Error de configuración: Contacta con el administrador.');
     }
     
-    throw new Error('No pudimos obtener recomendaciones. Verifica tu clave API o conexión.');
+    throw new Error('No pudimos obtener recomendaciones en este momento. Inténtalo más tarde.');
   }
 }
 
