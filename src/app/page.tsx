@@ -35,7 +35,7 @@ export default function Home() {
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
-  // Mapa de calificaciones para acceso rápido (usando ID estable)
+  // Mapa de calificaciones para acceso rápido
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
@@ -98,7 +98,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ReelRecs-Backup-${user.email}-${new Date().toLocaleDateString()}.json`;
+    link.download = `ReelRecs-Backup-${user.email}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -135,7 +135,6 @@ export default function Home() {
     <main className="min-h-screen bg-background flex flex-col items-center">
       <Toaster />
       
-      {/* Navbar con Usuario */}
       <nav className="w-full border-b border-border/10 bg-card/30 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('explore')}>
           <Film className="w-6 h-6 text-primary" />
@@ -183,7 +182,6 @@ export default function Home() {
         </section>
       </header>
 
-      {/* Secciones de Contenido */}
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex justify-center mb-8">
@@ -200,7 +198,6 @@ export default function Home() {
             </TabsList>
           </div>
 
-          {/* EXPLORAR / RECOMENDACIONES */}
           <TabsContent value="explore" className="mt-0 outline-none">
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-4">
@@ -234,7 +231,6 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {/* POR VER (WATCHLIST) */}
           <TabsContent value="watchlist" className="mt-0 outline-none">
             {watchlistMovies && watchlistMovies.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -259,7 +255,6 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {/* HISTORIAL (WATCHED) */}
           <TabsContent value="history" className="mt-0 outline-none">
             {watchedMovies && watchedMovies.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">

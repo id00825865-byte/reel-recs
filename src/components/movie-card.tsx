@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, ImageOff } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -30,7 +30,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
   const { user } = useUser();
   const db = useFirestore();
 
-  // Generar un ID estable y limpio para evitar problemas con símbolos o espacios
   const stableId = useMemo(() => 
     movie.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'), 
     [movie.title]
@@ -40,7 +39,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     if (!user || !db) return;
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
-    // Si la calificamos o marcamos, la quitamos de la lista de deseos
     if (isInWatchlist) {
       const watchlistRef = doc(db, 'users', user.uid, 'watchlist', stableId);
       deleteDocumentNonBlocking(watchlistRef);
@@ -55,8 +53,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       rating: rating > 0 ? rating : (movie.rating || 0)
     };
 
-    // Solo actualizamos la fecha si es la primera vez que la marcamos
-    // Esto evita que la película "salte" en la lista del historial al calificarla
     if (!isWatched) {
       updateData.watchedAt = new Date().toISOString();
     }
