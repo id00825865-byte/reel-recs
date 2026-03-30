@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,23 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     [movie.title]
   );
 
-  const handleMarkAsWatched = (rating: number = 0) => {
+  const handleUpdateRating = useCallback((newRating: number) => {
+    if (!user || !db) return;
+    const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
+    
+    // Si estamos actualizando la nota, nos aseguramos de no perder los datos existentes
+    setDocumentNonBlocking(docRef, {
+      id: stableId,
+      userId: user.uid,
+      movieId: stableId,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
+      rating: newRating,
+      // Solo añadimos watchedAt si no existía ya (para no resetear el orden en el historial)
+    }, { merge: true });
+  }, [user, db, stableId, movie.title, movie.posterUrl]);
+
+  const handleMarkAsWatched = () => {
     if (!user || !db) return;
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
@@ -44,20 +60,15 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       deleteDocumentNonBlocking(watchlistRef);
     }
 
-    const updateData: any = {
+    setDocumentNonBlocking(docRef, {
       id: stableId,
       userId: user.uid,
       movieId: stableId,
       title: movie.title,
       posterUrl: movie.posterUrl,
-      rating: rating > 0 ? rating : (movie.rating || 0)
-    };
-
-    if (!isWatched) {
-      updateData.watchedAt = new Date().toISOString();
-    }
-
-    setDocumentNonBlocking(docRef, updateData, { merge: true });
+      rating: movie.rating || 0,
+      watchedAt: new Date().toISOString()
+    }, { merge: true });
   };
 
   const handleToggleWatchlist = () => {
@@ -123,7 +134,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
           {!isWatched && user && (
             <>
               <Button 
-                onClick={() => handleMarkAsWatched(0)}
+                onClick={handleMarkAsWatched}
                 variant="default" 
                 size="sm"
                 className="w-full bg-primary/90 hover:bg-primary backdrop-blur-md gap-2 rounded-xl h-11"
@@ -156,7 +167,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
             <RatingStars 
               rating={movie.rating || 0} 
               interactive={true} 
-              onRatingChange={(newRating) => handleMarkAsWatched(newRating)} 
+              onRatingChange={handleUpdateRating} 
             />
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface RatingStarsProps {
   rating: number;
@@ -13,9 +13,14 @@ interface RatingStarsProps {
 export function RatingStars({ rating, onRatingChange, interactive = false }: RatingStarsProps) {
   const [hoverRating, setHoverRating] = useState(0);
   const [localRating, setLocalRating] = useState(rating);
+  const lastSyncRating = useRef(rating);
 
+  // Sincronizamos con el prop rating solo si ha cambiado externamente de forma significativa
   useEffect(() => {
-    setLocalRating(rating);
+    if (rating !== lastSyncRating.current) {
+      setLocalRating(rating);
+      lastSyncRating.current = rating;
+    }
   }, [rating]);
 
   const displayRating = hoverRating || localRating;
@@ -23,6 +28,7 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
   const handleRatingClick = (newRating: number) => {
     if (interactive && onRatingChange) {
       setLocalRating(newRating);
+      lastSyncRating.current = newRating;
       onRatingChange(newRating);
     }
   };
