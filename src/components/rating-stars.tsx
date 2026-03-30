@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Star } from 'lucide-react';
@@ -15,7 +16,7 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
   const [localRating, setLocalRating] = useState(rating);
   const lastSyncRating = useRef(rating);
 
-  // Sincronizamos con el prop rating solo si ha cambiado externamente de forma significativa
+  // Sincronizamos con el prop rating solo si ha cambiado externamente
   useEffect(() => {
     if (rating !== lastSyncRating.current) {
       setLocalRating(rating);
@@ -27,8 +28,10 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
 
   const handleRatingClick = (newRating: number) => {
     if (interactive && onRatingChange) {
+      // Actualizamos localmente primero para feedback instantáneo
       setLocalRating(newRating);
       lastSyncRating.current = newRating;
+      // Enviamos a la base de datos
       onRatingChange(newRating);
     }
   };

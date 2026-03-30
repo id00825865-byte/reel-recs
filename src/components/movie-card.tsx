@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -39,7 +40,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     if (!user || !db) return;
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
-    // Si estamos actualizando la nota, nos aseguramos de no perder los datos existentes
     setDocumentNonBlocking(docRef, {
       id: stableId,
       userId: user.uid,
@@ -47,7 +47,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       title: movie.title,
       posterUrl: movie.posterUrl,
       rating: newRating,
-      // Solo añadimos watchedAt si no existía ya (para no resetear el orden en el historial)
     }, { merge: true });
   }, [user, db, stableId, movie.title, movie.posterUrl]);
 

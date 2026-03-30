@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and mood/duration filters.
@@ -30,7 +31,7 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
-        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB w500 format).'),
+        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB or IMDb/Amazon format).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         director: z.string().describe('The name of the movie\'s director.'),
         actors: z.array(z.string()).describe('A list of the main actors.'),
@@ -72,11 +73,12 @@ STRICT EXCLUSION LIST (Do NOT recommend these):
 {{/if}}
 
 STRICT INSTRUCTIONS FOR POSTERS:
-1. You MUST provide the REAL official poster URL from TMDB.
-2. TMDB URLs follow this structure: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-3. Use your knowledge to find the correct <POSTER_ID> for the movies.
-4. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.
-5. NO placeholders, NO picsum, NO unsplash.`,
+1. You MUST provide the REAL official poster URL.
+2. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+3. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
+4. Use your knowledge to find the ACTUAL poster ID. 
+5. NO placeholders, NO picsum, NO unsplash.
+6. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
