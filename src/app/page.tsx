@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Download, Clock, Smile } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Download, Clock, Smile, MonitorPlay } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
@@ -22,6 +22,7 @@ export default function Home() {
   const [preferences, setPreferences] = useState('');
   const [mood, setMood] = useState('any');
   const [duration, setDuration] = useState('any');
+  const [platform, setPlatform] = useState('any');
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendMoviesOutput | null>(null);
   const [activeTab, setActiveTab] = useState('explore');
@@ -31,14 +32,14 @@ export default function Home() {
   const db = useFirestore();
   const auth = useAuth();
 
-  // Suscribirse a películas vistas
+  // Suscribirse a películas vistas con tiempo real
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
-  // Mapa de calificaciones para acceso rápido
+  // Mapa de calificaciones para acceso rápido y persistente
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
@@ -71,6 +72,7 @@ export default function Home() {
         excludeMovies: watchedMovies?.map(m => m.title) || [],
         mood: mood !== 'any' ? mood : undefined,
         maxDuration: duration !== 'any' ? duration : undefined,
+        platform: platform !== 'any' ? platform : undefined,
       });
       setRecommendations(results);
       setActiveTab('explore');
@@ -213,6 +215,23 @@ export default function Home() {
                     <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
                     <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
                     <SelectItem value="Long movies">Películas largas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
+                <MonitorPlay className="w-4 h-4 text-primary" />
+                <Select value={platform} onValueChange={setPlatform}>
+                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
+                    <SelectValue placeholder="Plataforma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Todas las plataformas</SelectItem>
+                    <SelectItem value="Netflix">Netflix</SelectItem>
+                    <SelectItem value="Disney+">Disney+</SelectItem>
+                    <SelectItem value="HBO Max">HBO Max</SelectItem>
+                    <SelectItem value="Prime Video">Prime Video</SelectItem>
+                    <SelectItem value="Apple TV+">Apple TV+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

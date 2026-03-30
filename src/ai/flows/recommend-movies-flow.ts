@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and mood/duration filters.
+ * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and mood/duration/platform filters.
  */
 
 import {ai} from '@/ai/genkit';
@@ -23,6 +22,10 @@ const RecommendMoviesInputSchema = z.object({
     .string()
     .optional()
     .describe('The maximum duration the user is looking for (e.g., "Under 90 min").'),
+  platform: z
+    .string()
+    .optional()
+    .describe('The streaming platform the user has access to (e.g., Netflix, Disney+, HBO Max).'),
 });
 export type RecommendMoviesInput = z.infer<typeof RecommendMoviesInputSchema>;
 
@@ -51,7 +54,7 @@ const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie librarian with absolute knowledge of the global movie database.
+  prompt: `You are an expert movie librarian with absolute knowledge of the global movie database and streaming catalogs.
 
 USER PREFERENCES: {{{preferences}}}
 
@@ -63,6 +66,11 @@ CURRENT MOOD: {{{mood}}}
 {{#if maxDuration}}
 MAX DURATION CONSTRAINT: {{{maxDuration}}}
 (Strictly recommend movies that fit within this time frame).
+{{/if}}
+
+{{#if platform}}
+STREAMING PLATFORM: {{{platform}}}
+(Strictly prioritize movies that are currently available on this platform).
 {{/if}}
 
 {{#if excludeMovies}}
