@@ -40,8 +40,8 @@ const RecommendMoviesOutputSchema = z.object({
         actors: z.array(z.string()).describe('A list of the main actors.'),
       })
     )
-    .min(3)
-    .describe('An array of recommended movies.'),
+    .min(4)
+    .describe('An array of exactly 4 recommended movies.'),
 });
 export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
@@ -55,6 +55,8 @@ const prompt = ai.definePrompt({
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
   prompt: `You are an expert movie librarian with absolute knowledge of the global movie database and streaming catalogs.
+
+STRICT INSTRUCTION: You MUST return exactly 4 recommendations.
 
 USER PREFERENCES: {{{preferences}}}
 
