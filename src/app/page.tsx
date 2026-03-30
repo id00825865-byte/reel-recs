@@ -7,7 +7,8 @@ import { AuthForm } from '@/components/auth-form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Download, Clock, Smile } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
@@ -19,6 +20,8 @@ const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z
 
 export default function Home() {
   const [preferences, setPreferences] = useState('');
+  const [mood, setMood] = useState('any');
+  const [duration, setDuration] = useState('any');
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendMoviesOutput | null>(null);
   const [activeTab, setActiveTab] = useState('explore');
@@ -65,7 +68,9 @@ export default function Home() {
     try {
       const results = await recommendMovies({ 
         preferences,
-        excludeMovies: watchedMovies?.map(m => m.title) || [] 
+        excludeMovies: watchedMovies?.map(m => m.title) || [],
+        mood: mood !== 'any' ? mood : undefined,
+        maxDuration: duration !== 'any' ? duration : undefined,
       });
       setRecommendations(results);
       setActiveTab('explore');
@@ -159,8 +164,8 @@ export default function Home() {
           ¿Qué <span className="text-primary italic">cine</span> te apetece?
         </h1>
         
-        <section className="w-full max-w-3xl mt-8">
-          <form onSubmit={handleSearch} className="relative group">
+        <section className="w-full max-w-4xl mt-8">
+          <form onSubmit={handleSearch} className="space-y-4">
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl focus-within:border-primary/50 transition-all">
               <Input
                 placeholder="Busca por género, humor o películas similares..."
@@ -177,6 +182,40 @@ export default function Home() {
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Buscar</>}
               </Button>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
+                <Smile className="w-4 h-4 text-primary" />
+                <Select value={mood} onValueChange={setMood}>
+                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
+                    <SelectValue placeholder="Ánimo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier ánimo</SelectItem>
+                    <SelectItem value="Happy">Alegre</SelectItem>
+                    <SelectItem value="Sad">Triste / Melancólico</SelectItem>
+                    <SelectItem value="Exciting">Emocionante / Acción</SelectItem>
+                    <SelectItem value="Relaxing">Relajado / Tranquilo</SelectItem>
+                    <SelectItem value="Scary">Miedo / Tensión</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
+                <Clock className="w-4 h-4 text-primary" />
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
+                    <SelectValue placeholder="Tiempo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier duración</SelectItem>
+                    <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
+                    <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
+                    <SelectItem value="Long movies">Películas largas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </form>
         </section>
