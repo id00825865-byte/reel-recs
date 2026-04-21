@@ -12,10 +12,10 @@ interface RatingStarsProps {
 
 export function RatingStars({ rating, onRatingChange, interactive = false }: RatingStarsProps) {
   const [hoverRating, setHoverRating] = useState(0);
-  // Estado local para que la UI responda instantáneamente sin esperar a Firestore
+  // Estado local para respuesta inmediata
   const [localRating, setLocalRating] = useState(rating);
 
-  // Sincronizar con el prop cuando cambie (por ejemplo, al cargar datos)
+  // Sincronizar con el prop cuando cambie de verdad en la base de datos
   useEffect(() => {
     setLocalRating(rating);
   }, [rating]);
@@ -24,7 +24,7 @@ export function RatingStars({ rating, onRatingChange, interactive = false }: Rat
 
   const handleRatingClick = (newRating: number) => {
     if (interactive && onRatingChange) {
-      setLocalRating(newRating); // Actualizar localmente al instante
+      setLocalRating(newRating);
       onRatingChange(newRating);
     }
   };

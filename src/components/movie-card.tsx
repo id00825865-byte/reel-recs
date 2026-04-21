@@ -51,6 +51,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     if (!user || !db) return;
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
+    // Al actualizar la calificación, nos aseguramos de mantener todos los datos
     setDocumentNonBlocking(docRef, {
       title: movie.title,
       posterUrl: movie.posterUrl,
