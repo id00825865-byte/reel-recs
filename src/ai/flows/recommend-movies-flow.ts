@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and mood/duration/platform filters.
+ * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and release year.
  */
 
 import {ai} from '@/ai/genkit';
@@ -34,6 +34,7 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
+        year: z.string().describe('The release year of the movie (e.g., "2023").'),
         posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB or IMDb/Amazon format).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         duration: z.string().describe('The duration of the movie in hours and minutes (e.g., "1h 45m").'),
@@ -84,12 +85,13 @@ STRICT EXCLUSION LIST (Do NOT recommend these):
 {{/if}}
 
 STRICT INSTRUCTIONS FOR CONTENT:
-1. You MUST provide the duration of the movie in hours and minutes (e.g., "2h 15m").
-2. You MUST provide the REAL official poster URL.
-3. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-4. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
-5. Use your knowledge to find the ACTUAL poster ID. 
-6. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.`,
+1. You MUST provide the release YEAR of the movie.
+2. You MUST provide the duration of the movie in hours and minutes (e.g., "2h 15m").
+3. You MUST provide the REAL official poster URL.
+4. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+5. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
+6. Use your knowledge to find the ACTUAL poster ID. 
+7. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(

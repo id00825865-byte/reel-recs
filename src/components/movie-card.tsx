@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock, Calendar } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -14,6 +14,7 @@ import { RatingStars } from '@/components/rating-stars';
 interface MovieCardProps {
   movie: {
     title: string;
+    year?: string;
     posterUrl: string;
     synopsis: string;
     duration?: string;
@@ -41,15 +42,13 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
     setDocumentNonBlocking(docRef, {
+      ...movie,
       id: stableId,
       userId: user.uid,
       movieId: stableId,
-      title: movie.title,
-      posterUrl: movie.posterUrl,
-      duration: movie.duration || "",
       rating: newRating,
     }, { merge: true });
-  }, [user, db, stableId, movie.title, movie.posterUrl, movie.duration]);
+  }, [user, db, stableId, movie]);
 
   const handleMarkAsWatched = () => {
     if (!user || !db) return;
@@ -61,13 +60,10 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     }
 
     setDocumentNonBlocking(docRef, {
+      ...movie,
       id: stableId,
       userId: user.uid,
       movieId: stableId,
-      title: movie.title,
-      posterUrl: movie.posterUrl,
-      duration: movie.duration || "",
-      rating: movie.rating || 0,
       watchedAt: new Date().toISOString()
     }, { merge: true });
   };
@@ -80,11 +76,9 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       deleteDocumentNonBlocking(docRef);
     } else {
       setDocumentNonBlocking(docRef, {
+        ...movie,
         id: stableId,
         userId: user.uid,
-        title: movie.title,
-        posterUrl: movie.posterUrl,
-        duration: movie.duration || "",
         addedAt: new Date().toISOString(),
       }, { merge: true });
     }
@@ -157,10 +151,16 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       </div>
       
       <CardContent className="p-5">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-col mb-2">
           <h3 className="font-headline text-xl font-bold text-primary line-clamp-1">
             {movie.title}
           </h3>
+          {movie.year && (
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+              <Calendar className="w-3 h-3 text-primary/50" />
+              <span>{movie.year}</span>
+            </div>
+          )}
         </div>
         
         {isWatched && (
@@ -185,7 +185,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
             {movie.director && (
               <div className="flex items-center gap-2 text-[10px]">
                 <Clapperboard className="w-3 h-3 text-accent" />
-                <span className="text-muted-foreground">{movie.director}</span>
+                <span className="text-muted-foreground font-medium">{movie.director}</span>
               </div>
             )}
             {movie.duration && (
@@ -198,7 +198,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
           
           {movie.actors && movie.actors.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {movie.actors.slice(0, 2).map((actor) => (
+              {movie.actors.slice(0, 3).map((actor) => (
                 <Badge key={actor} variant="secondary" className="bg-secondary/30 text-foreground/60 border-none text-[9px] px-2 py-0">
                   {actor}
                 </Badge>

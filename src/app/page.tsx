@@ -272,9 +272,12 @@ export default function Home() {
                     key={movie.id} 
                     movie={{
                       title: movie.title,
+                      year: movie.year,
                       posterUrl: movie.posterUrl,
-                      synopsis: "",
-                      duration: movie.duration
+                      synopsis: movie.synopsis || "",
+                      duration: movie.duration,
+                      director: movie.director,
+                      actors: movie.actors,
                     }} 
                     index={idx}
                     isInWatchlist={true}
@@ -297,9 +300,12 @@ export default function Home() {
                     key={movie.id} 
                     movie={{
                       title: movie.title,
+                      year: movie.year,
                       posterUrl: movie.posterUrl,
-                      synopsis: "",
+                      synopsis: movie.synopsis || "",
                       duration: movie.duration,
+                      director: movie.director,
+                      actors: movie.actors,
                       rating: movie.rating
                     }} 
                     index={idx}
