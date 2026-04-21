@@ -12,22 +12,12 @@ import {
   BookmarkPlus, 
   BookmarkCheck, 
   Clock, 
-  Users, 
-  Star,
-  Info,
-  User
+  Star
 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { RatingStars } from '@/components/rating-stars';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 interface MovieCardProps {
   movie: {
@@ -159,72 +149,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
               <Star className="w-2.5 h-2.5 fill-black" /> IMDb {movie.imdbRating}
             </Badge>
           )}
-
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 text-white border-none shadow-lg">
-                <Info className="w-4 h-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-card border-border/50 text-foreground">
-              <DialogHeader>
-                <DialogTitle className="font-headline text-3xl font-black text-primary flex items-center gap-3">
-                  {movie.title}
-                  {movie.year && <span className="text-muted-foreground text-xl font-normal">({movie.year})</span>}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                <div className="relative aspect-[2/3] rounded-xl overflow-hidden shadow-2xl">
-                   <Image
-                    src={movie.posterUrl}
-                    alt={movie.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-4">
-                    {movie.duration && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4 text-primary" />
-                        {movie.duration}
-                      </div>
-                    )}
-                    {movie.imdbRating && (
-                      <div className="flex items-center gap-2 text-sm text-yellow-500 font-bold">
-                        <Star className="w-4 h-4 fill-yellow-500" />
-                        IMDb {movie.imdbRating}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs uppercase tracking-wider font-bold text-primary">Sinopsis</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                      {movie.synopsis || "No hay sinopsis disponible."}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs uppercase tracking-wider font-bold text-primary">Director</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <User className="w-4 h-4" />
-                      {movie.director || "Desconocido"}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs uppercase tracking-wider font-bold text-primary">Reparto</h4>
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Users className="w-4 h-4 shrink-0 mt-0.5" />
-                      <p>{movie.actors?.join(', ') || "No especificado"}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
