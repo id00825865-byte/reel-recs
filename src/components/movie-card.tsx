@@ -14,7 +14,8 @@ import {
   Clock, 
   Star,
   Users,
-  Info
+  Info,
+  Tv
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -39,6 +40,7 @@ interface MovieCardProps {
     director?: string;
     actors?: string[];
     rating?: number;
+    platforms?: string[];
   };
   index: number;
   isWatched?: boolean;
@@ -80,6 +82,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       duration: movie.duration,
       director: movie.director,
       actors: movie.actors,
+      platforms: movie.platforms || [],
     }, { merge: true });
   };
 
@@ -100,6 +103,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
         duration: movie.duration,
         director: movie.director,
         actors: movie.actors,
+        platforms: movie.platforms || [],
       }, { merge: true });
     }
   };
@@ -149,7 +153,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
           )}
         </div>
 
-        {/* Botón de Información */}
         <div className="absolute top-4 left-4 z-20">
           <Dialog>
             <DialogTrigger asChild>
@@ -157,9 +160,9 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
                 <Info className="w-4 h-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-card border-border/50 text-foreground overflow-hidden p-0 gap-0">
+            <DialogContent className="max-w-4xl bg-card border-border/50 text-foreground overflow-hidden p-0 gap-0">
               <div className="flex flex-col md:flex-row h-full">
-                <div className="w-full md:w-1/3 aspect-[2/3] relative">
+                <div className="w-full md:w-2/5 aspect-[2/3] relative">
                   {!hasError ? (
                     <Image
                       src={movie.posterUrl}
@@ -174,58 +177,75 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
                     </div>
                   )}
                 </div>
-                <div className="p-6 md:w-2/3 flex flex-col gap-4 overflow-y-auto">
+                <div className="p-8 md:w-3/5 flex flex-col gap-6 overflow-y-auto max-h-[90vh]">
                   <DialogHeader>
-                    <div className="flex justify-between items-start gap-2">
-                      <DialogTitle className="font-headline text-3xl font-black text-primary">
+                    <div className="flex justify-between items-start gap-4">
+                      <DialogTitle className="font-headline text-4xl font-black text-primary leading-tight">
                         {movie.title}
                       </DialogTitle>
                       {movie.year && (
-                        <span className="text-xl font-bold text-muted-foreground">{movie.year}</span>
+                        <span className="text-2xl font-bold text-muted-foreground shrink-0">{movie.year}</span>
                       )}
                     </div>
                   </DialogHeader>
 
                   <div className="flex flex-wrap gap-3">
                     {movie.imdbRating && (
-                      <Badge className="bg-yellow-500 text-black font-bold gap-1 px-3 py-1">
+                      <Badge className="bg-yellow-500 text-black font-bold gap-1 px-3 py-1.5">
                         <Star className="w-4 h-4 fill-black" /> {movie.imdbRating} IMDb
                       </Badge>
                     )}
                     {movie.duration && (
-                      <Badge variant="secondary" className="gap-1 px-3 py-1 font-bold">
+                      <Badge variant="secondary" className="gap-1 px-3 py-1.5 font-bold">
                         <Clock className="w-4 h-4" /> {movie.duration}
                       </Badge>
                     )}
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Sinopsis</h4>
-                      <p className="text-muted-foreground leading-relaxed italic">
+                      <h4 className="text-xs uppercase tracking-[0.2em] font-black text-primary mb-2">Sinopsis</h4>
+                      <p className="text-muted-foreground text-lg leading-relaxed italic">
                         {movie.synopsis || "Sin sinopsis disponible."}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      {movie.director && (
+                    <div className="grid grid-cols-1 gap-6">
+                      {movie.platforms && movie.platforms.length > 0 && (
                         <div>
-                          <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Director</h4>
-                          <p className="font-medium">{movie.director}</p>
-                        </div>
-                      )}
-                      {movie.actors && movie.actors.length > 0 && (
-                        <div>
-                          <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Reparto</h4>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {movie.actors.map((actor, i) => (
-                              <Badge key={i} variant="outline" className="bg-secondary/30 border-border/40">
-                                {actor}
+                          <h4 className="text-xs uppercase tracking-[0.2em] font-black text-primary mb-2 flex items-center gap-2">
+                            <Tv className="w-4 h-4" /> Disponible en
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {movie.platforms.map((p, i) => (
+                              <Badge key={i} className="bg-primary/20 text-primary border-primary/30 px-3 py-1">
+                                {p}
                               </Badge>
                             ))}
                           </div>
                         </div>
                       )}
+                      
+                      <div className="flex flex-col md:flex-row gap-8">
+                        {movie.director && (
+                          <div className="flex-1">
+                            <h4 className="text-xs uppercase tracking-[0.2em] font-black text-primary mb-2">Director</h4>
+                            <p className="text-lg font-bold">{movie.director}</p>
+                          </div>
+                        )}
+                        {movie.actors && movie.actors.length > 0 && (
+                          <div className="flex-[2]">
+                            <h4 className="text-xs uppercase tracking-[0.2em] font-black text-primary mb-2">Reparto Principal</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {movie.actors.map((actor, i) => (
+                                <Badge key={i} variant="outline" className="bg-secondary/30 border-border/40 px-3 py-1">
+                                  {actor}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

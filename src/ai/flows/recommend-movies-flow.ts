@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and duration.
+ * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and platform availability.
  */
 
 import {ai} from '@/ai/genkit';
@@ -41,6 +41,7 @@ const RecommendMoviesOutputSchema = z.object({
         duration: z.string().describe('The duration of the movie in hours and minutes (e.g., "1h 45m").'),
         director: z.string().describe('The name of the movie\'s director.'),
         actors: z.array(z.string()).describe('A list of the main actors.'),
+        platforms: z.array(z.string()).describe('A list of major streaming platforms where this movie is currently available (e.g., ["Netflix", "Prime Video"]).'),
       })
     )
     .min(4)
@@ -88,7 +89,8 @@ INSTRUCTIONS:
 2. Provide the REAL official poster URL from TMDB or Amazon.
 3. PREFER TMDB: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
 4. SECONDARY (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
-5. Always include the release year and the real IMDb rating.`,
+5. Always include the release year and the real IMDb rating.
+6. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
