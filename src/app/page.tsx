@@ -262,6 +262,7 @@ export default function Home() {
                       duration: movie.duration,
                       director: movie.director,
                       actors: movie.actors,
+                      platforms: movie.platforms || [],
                     }} 
                     index={idx}
                     isInWatchlist={true}
@@ -292,6 +293,7 @@ export default function Home() {
                       duration: movie.duration,
                       director: movie.director,
                       actors: movie.actors,
+                      platforms: movie.platforms || [],
                     }} 
                     index={idx}
                     isWatched={true}
