@@ -2,7 +2,7 @@
 
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface RatingStarsProps {
   rating: number;
@@ -12,11 +12,19 @@ interface RatingStarsProps {
 
 export function RatingStars({ rating, onRatingChange, interactive = false }: RatingStarsProps) {
   const [hoverRating, setHoverRating] = useState(0);
+  // Estado local para que la UI responda instantáneamente sin esperar a Firestore
+  const [localRating, setLocalRating] = useState(rating);
 
-  const displayRating = hoverRating || rating;
+  // Sincronizar con el prop cuando cambie (por ejemplo, al cargar datos)
+  useEffect(() => {
+    setLocalRating(rating);
+  }, [rating]);
+
+  const displayRating = hoverRating || localRating;
 
   const handleRatingClick = (newRating: number) => {
     if (interactive && onRatingChange) {
+      setLocalRating(newRating); // Actualizar localmente al instante
       onRatingChange(newRating);
     }
   };

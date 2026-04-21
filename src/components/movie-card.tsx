@@ -12,7 +12,8 @@ import {
   BookmarkPlus, 
   BookmarkCheck, 
   Clock, 
-  Star
+  Star,
+  Users
 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -197,12 +198,21 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
         )}
 
         {movie.synopsis && (
-          <p className="text-muted-foreground text-xs line-clamp-2 mb-4 leading-relaxed italic">
+          <p className="text-muted-foreground text-xs line-clamp-2 mb-3 leading-relaxed italic">
             "{movie.synopsis}"
           </p>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-2">
+          {movie.actors && movie.actors.length > 0 && (
+            <div className="flex items-start gap-2 text-[10px]">
+              <Users className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+              <span className="text-muted-foreground line-clamp-1">
+                {movie.actors.join(', ')}
+              </span>
+            </div>
+          )}
+          
           <div className="flex items-center justify-between">
             {movie.director && (
               <div className="flex items-center gap-2 text-[10px]">
