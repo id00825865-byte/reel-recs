@@ -185,6 +185,8 @@ export default function Home() {
                   <SelectItem value="Netflix">Netflix</SelectItem>
                   <SelectItem value="Disney+">Disney+</SelectItem>
                   <SelectItem value="HBO Max">HBO Max</SelectItem>
+                  <SelectItem value="Prime Video">Prime Video</SelectItem>
+                  <SelectItem value="Apple TV+">Apple TV+</SelectItem>
                 </SelectContent>
               </Select>
             </div>

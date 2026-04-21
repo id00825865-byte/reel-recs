@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock, Users } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -164,17 +164,28 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
           </p>
         )}
 
-        <div className="flex items-center justify-between">
-          {movie.director && (
-            <div className="flex items-center gap-2 text-[10px]">
-              <Clapperboard className="w-3 h-3 text-accent" />
-              <span className="text-muted-foreground font-medium">{movie.director}</span>
-            </div>
-          )}
-          {movie.duration && (
-            <div className="flex items-center gap-1.5 text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full">
-              <Clock className="w-3 h-3 text-primary" />
-              <span className="text-muted-foreground font-medium">{movie.duration}</span>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            {movie.director && (
+              <div className="flex items-center gap-2 text-[10px]">
+                <Clapperboard className="w-3 h-3 text-accent" />
+                <span className="text-muted-foreground font-medium">{movie.director}</span>
+              </div>
+            )}
+            {movie.duration && (
+              <div className="flex items-center gap-1.5 text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full">
+                <Clock className="w-3 h-3 text-primary" />
+                <span className="text-muted-foreground font-medium">{movie.duration}</span>
+              </div>
+            )}
+          </div>
+
+          {movie.actors && movie.actors.length > 0 && (
+            <div className="flex items-start gap-2 text-[10px] border-t border-border/10 pt-2">
+              <Users className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+              <p className="text-muted-foreground line-clamp-1">
+                {movie.actors.join(', ')}
+              </p>
             </div>
           )}
         </div>
