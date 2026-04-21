@@ -77,9 +77,13 @@ export default function Home() {
       setRecommendations(results);
       setActiveTab('explore');
     } catch (error: any) {
+      const errorMessage = error.message?.includes('503') 
+        ? "Los servidores de Google están saturados temporalmente. Por favor, inténtalo de nuevo en unos segundos."
+        : (error.message || "No pudimos obtener recomendaciones.");
+        
       toast({
         title: "Error en la búsqueda",
-        description: error.message || "No pudimos obtener recomendaciones.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
