@@ -15,7 +15,6 @@ import {
   Users, 
   Star,
   Info,
-  Calendar,
   User
 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
@@ -65,7 +64,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       title: movie.title,
       posterUrl: movie.posterUrl,
       rating: newRating,
-      // Guardamos el resto para persistencia
       year: movie.year,
       imdbRating: movie.imdbRating,
       synopsis: movie.synopsis,
