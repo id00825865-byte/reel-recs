@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Clock, Smile, MonitorPlay } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -134,7 +135,7 @@ export default function Home() {
         </h1>
         
         <section className="w-full max-w-4xl mt-8">
-          <form onSubmit={handleSearch} className="space-y-4">
+          <form onSubmit={handleSearch} className="space-y-6">
             <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl">
               <Input
                 placeholder="Busca por género, humor o películas similares..."
@@ -152,43 +153,55 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4">
-              <Select value={mood} onValueChange={setMood}>
-                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
-                  <SelectValue placeholder="Ánimo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Cualquier ánimo</SelectItem>
-                  <SelectItem value="Happy">Alegre</SelectItem>
-                  <SelectItem value="Sad">Triste</SelectItem>
-                  <SelectItem value="Exciting">Acción</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap justify-center gap-8">
+              <div className="flex flex-col items-center gap-2">
+                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Estado de Ánimo</Label>
+                <Select value={mood} onValueChange={setMood}>
+                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
+                    <SelectValue placeholder="Ánimo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier ánimo</SelectItem>
+                    <SelectItem value="Happy">Alegre</SelectItem>
+                    <SelectItem value="Sad">Triste</SelectItem>
+                    <SelectItem value="Exciting">Acción / Emocionante</SelectItem>
+                    <SelectItem value="Scary">Terror / Miedo</SelectItem>
+                    <SelectItem value="Romantic">Romántico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
-                  <SelectValue placeholder="Tiempo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Cualquier tiempo</SelectItem>
-                  <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
-                  <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col items-center gap-2">
+                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Duración</Label>
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
+                    <SelectValue placeholder="Tiempo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier tiempo</SelectItem>
+                    <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
+                    <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
+                    <SelectItem value="More than 120 min">Películas largas (+2h)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={platform} onValueChange={setPlatform}>
-                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
-                  <SelectValue placeholder="Plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Cualquier plataforma</SelectItem>
-                  <SelectItem value="Netflix">Netflix</SelectItem>
-                  <SelectItem value="Disney+">Disney+</SelectItem>
-                  <SelectItem value="HBO Max">HBO Max</SelectItem>
-                  <SelectItem value="Prime Video">Prime Video</SelectItem>
-                  <SelectItem value="Apple TV+">Apple TV+</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col items-center gap-2">
+                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Plataforma</Label>
+                <Select value={platform} onValueChange={setPlatform}>
+                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
+                    <SelectValue placeholder="Plataforma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier plataforma</SelectItem>
+                    <SelectItem value="Netflix">Netflix</SelectItem>
+                    <SelectItem value="Disney+">Disney+</SelectItem>
+                    <SelectItem value="HBO Max">HBO Max</SelectItem>
+                    <SelectItem value="Prime Video">Prime Video</SelectItem>
+                    <SelectItem value="Apple TV+">Apple TV+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </form>
         </section>

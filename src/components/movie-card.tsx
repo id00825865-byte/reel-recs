@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock, Users } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock, Users, Star } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -14,6 +14,8 @@ import { RatingStars } from '@/components/rating-stars';
 interface MovieCardProps {
   movie: {
     title: string;
+    year?: string;
+    imdbRating?: number;
     posterUrl: string;
     synopsis: string;
     duration?: string;
@@ -116,6 +118,11 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
               <BookmarkCheck className="w-3.5 h-3.5" /> En lista
             </Badge>
           )}
+          {movie.imdbRating && (
+            <Badge className="bg-yellow-500 text-black gap-1 px-2 py-0.5 text-[10px] shadow-xl border-none font-bold">
+              <Star className="w-2.5 h-2.5 fill-black" /> IMDb {movie.imdbRating}
+            </Badge>
+          )}
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -143,9 +150,14 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       </div>
       
       <CardContent className="p-5">
-        <h3 className="font-headline text-xl font-bold text-primary line-clamp-1 mb-2">
-          {movie.title}
-        </h3>
+        <div className="flex justify-between items-start mb-2 gap-2">
+          <h3 className="font-headline text-xl font-bold text-primary line-clamp-1">
+            {movie.title}
+          </h3>
+          {movie.year && (
+            <span className="text-muted-foreground text-sm font-bold shrink-0">{movie.year}</span>
+          )}
+        </div>
         
         {isWatched && (
           <div className="mb-4 flex flex-col gap-1.5">
