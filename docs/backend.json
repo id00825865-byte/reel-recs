@@ -54,6 +54,21 @@
         "posterUrl": {
           "type": "string",
           "format": "uri"
+        },
+        "year": {
+          "type": "string"
+        },
+        "imdbRating": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -65,7 +80,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserWatchedMovie",
       "type": "object",
-      "description": "A movie marked as watched by a user, including an optional star rating.",
+      "description": "A movie marked as watched by a user, including full metadata and star rating.",
       "properties": {
         "id": {
           "type": "string"
@@ -88,9 +103,35 @@
         },
         "rating": {
           "type": "number",
-          "description": "User rating from 1 to 5 stars.",
           "minimum": 1,
           "maximum": 5
+        },
+        "year": {
+          "type": "string"
+        },
+        "imdbRating": {
+          "type": "number"
+        },
+        "synopsis": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "director": {
+          "type": "string"
+        },
+        "actors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -103,7 +144,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "WatchlistMovie",
       "type": "object",
-      "description": "A movie added to the user's 'to-watch' list.",
+      "description": "A movie added to the user's 'to-watch' list with full metadata.",
       "properties": {
         "id": {
           "type": "string"
@@ -120,6 +161,33 @@
         "addedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "year": {
+          "type": "string"
+        },
+        "imdbRating": {
+          "type": "number"
+        },
+        "synopsis": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "director": {
+          "type": "string"
+        },
+        "actors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
