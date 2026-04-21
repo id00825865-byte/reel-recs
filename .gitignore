@@ -1,4 +1,4 @@
-# dependencias
+# dependencies
 /node_modules
 /.pnp
 .pnp.js
@@ -10,24 +10,25 @@
 /.next/
 /out/
 
-# producción
+# production
 /build
 
-# archivos de sistema
+# misc
 .DS_Store
 *.pem
 
-# logs
+# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# archivos de entorno (MUY IMPORTANTE)
+# local env files
+.env*.local
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-# configuración de firebase studio
-/docs/checkpoint-*.md
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
