@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock, Calendar } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -14,7 +14,6 @@ import { RatingStars } from '@/components/rating-stars';
 interface MovieCardProps {
   movie: {
     title: string;
-    year?: string;
     posterUrl: string;
     synopsis: string;
     duration?: string;
@@ -42,13 +41,11 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
     
     setDocumentNonBlocking(docRef, {
-      ...movie,
-      id: stableId,
-      userId: user.uid,
-      movieId: stableId,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
       rating: newRating,
     }, { merge: true });
-  }, [user, db, stableId, movie]);
+  }, [user, db, stableId, movie.title, movie.posterUrl]);
 
   const handleMarkAsWatched = () => {
     if (!user || !db) return;
@@ -60,10 +57,8 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     }
 
     setDocumentNonBlocking(docRef, {
-      ...movie,
-      id: stableId,
-      userId: user.uid,
-      movieId: stableId,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
       watchedAt: new Date().toISOString()
     }, { merge: true });
   };
@@ -76,9 +71,8 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       deleteDocumentNonBlocking(docRef);
     } else {
       setDocumentNonBlocking(docRef, {
-        ...movie,
-        id: stableId,
-        userId: user.uid,
+        title: movie.title,
+        posterUrl: movie.posterUrl,
         addedAt: new Date().toISOString(),
       }, { merge: true });
     }
@@ -87,8 +81,6 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
   const fallbackUI = (
     <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-secondary/40 border-b border-border/10">
       <Clapperboard className="w-12 h-12 text-primary/30 mb-4" />
-      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Cartel oficial</span>
-      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">No disponible</span>
       <span className="text-lg font-headline font-bold text-primary leading-tight">{movie.title}</span>
     </div>
   );
@@ -151,17 +143,9 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       </div>
       
       <CardContent className="p-5">
-        <div className="flex flex-col mb-2">
-          <h3 className="font-headline text-xl font-bold text-primary line-clamp-1">
-            {movie.title}
-          </h3>
-          {movie.year && (
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
-              <Calendar className="w-3 h-3 text-primary/50" />
-              <span>{movie.year}</span>
-            </div>
-          )}
-        </div>
+        <h3 className="font-headline text-xl font-bold text-primary line-clamp-1 mb-2">
+          {movie.title}
+        </h3>
         
         {isWatched && (
           <div className="mb-4 flex flex-col gap-1.5">
@@ -180,29 +164,17 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
           </p>
         )}
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            {movie.director && (
-              <div className="flex items-center gap-2 text-[10px]">
-                <Clapperboard className="w-3 h-3 text-accent" />
-                <span className="text-muted-foreground font-medium">{movie.director}</span>
-              </div>
-            )}
-            {movie.duration && (
-              <div className="flex items-center gap-1.5 text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full">
-                <Clock className="w-3 h-3 text-primary" />
-                <span className="text-muted-foreground font-medium">{movie.duration}</span>
-              </div>
-            )}
-          </div>
-          
-          {movie.actors && movie.actors.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {movie.actors.slice(0, 3).map((actor) => (
-                <Badge key={actor} variant="secondary" className="bg-secondary/30 text-foreground/60 border-none text-[9px] px-2 py-0">
-                  {actor}
-                </Badge>
-              ))}
+        <div className="flex items-center justify-between">
+          {movie.director && (
+            <div className="flex items-center gap-2 text-[10px]">
+              <Clapperboard className="w-3 h-3 text-accent" />
+              <span className="text-muted-foreground font-medium">{movie.director}</span>
+            </div>
+          )}
+          {movie.duration && (
+            <div className="flex items-center gap-1.5 text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full">
+              <Clock className="w-3 h-3 text-primary" />
+              <span className="text-muted-foreground font-medium">{movie.duration}</span>
             </div>
           )}
         </div>

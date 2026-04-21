@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and release year.
+ * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and duration.
  */
 
 import {ai} from '@/ai/genkit';
@@ -34,7 +34,6 @@ const RecommendMoviesOutputSchema = z.object({
     .array(
       z.object({
         title: z.string().describe('The title of the movie.'),
-        year: z.string().describe('The release year of the movie (e.g., "2023").'),
         posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB or IMDb/Amazon format).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
         duration: z.string().describe('The duration of the movie in hours and minutes (e.g., "1h 45m").'),
@@ -43,6 +42,7 @@ const RecommendMoviesOutputSchema = z.object({
       })
     )
     .min(4)
+    .max(4)
     .describe('An array of exactly 4 recommended movies.'),
 });
 export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
@@ -56,7 +56,7 @@ const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
   output: {schema: RecommendMoviesOutputSchema},
-  prompt: `You are an expert movie librarian with absolute knowledge of the global movie database and streaming catalogs.
+  prompt: `You are an expert movie librarian. 
 
 STRICT INSTRUCTION: You MUST return exactly 4 recommendations.
 
@@ -64,34 +64,28 @@ USER PREFERENCES: {{{preferences}}}
 
 {{#if mood}}
 CURRENT MOOD: {{{mood}}}
-(Tailor recommendations to match this mood).
 {{/if}}
 
 {{#if maxDuration}}
-MAX DURATION CONSTRAINT: {{{maxDuration}}}
-(Strictly recommend movies that fit within this time frame).
+MAX DURATION: {{{maxDuration}}}
 {{/if}}
 
 {{#if platform}}
-STREAMING PLATFORM: {{{platform}}}
-(Strictly prioritize movies that are currently available on this platform).
+PLATFORM: {{{platform}}}
 {{/if}}
 
 {{#if excludeMovies}}
-STRICT EXCLUSION LIST (Do NOT recommend these):
+DO NOT RECOMMEND:
 {{#each excludeMovies}}
 - {{{this}}}
 {{/each}}
 {{/if}}
 
-STRICT INSTRUCTIONS FOR CONTENT:
-1. You MUST provide the release YEAR of the movie.
-2. You MUST provide the duration of the movie in hours and minutes (e.g., "2h 15m").
-3. You MUST provide the REAL official poster URL.
-4. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-5. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
-6. Use your knowledge to find the ACTUAL poster ID. 
-7. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.`,
+INSTRUCTIONS:
+1. Provide the duration in hours and minutes (e.g., "2h 15m").
+2. Provide the REAL official poster URL from TMDB or Amazon.
+3. PREFER TMDB: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+4. SECONDARY (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(

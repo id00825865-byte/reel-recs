@@ -15,7 +15,6 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '
 import { collection, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
-// Función para generar un ID estable y limpio
 const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
 
 export default function Home() {
@@ -32,14 +31,12 @@ export default function Home() {
   const db = useFirestore();
   const auth = useAuth();
 
-  // Suscribirse a películas vistas con tiempo real
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
-  // Mapa de calificaciones para acceso rápido y persistente
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
@@ -51,7 +48,6 @@ export default function Home() {
 
   const watchedIds = useMemo(() => Object.keys(watchedRatingsMap), [watchedRatingsMap]);
 
-  // Suscribirse a lista de deseos
   const watchlistQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
@@ -77,13 +73,9 @@ export default function Home() {
       setRecommendations(results);
       setActiveTab('explore');
     } catch (error: any) {
-      const errorMessage = error.message?.includes('503') 
-        ? "Los servidores de Google están saturados temporalmente. Por favor, inténtalo de nuevo en unos segundos."
-        : (error.message || "No pudimos obtener recomendaciones.");
-        
       toast({
         title: "Error en la búsqueda",
-        description: errorMessage,
+        description: error.message || "No pudimos obtener recomendaciones.",
         variant: "destructive",
       });
     } finally {
@@ -105,7 +97,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background">
+      <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
         <Toaster />
         <div className="mb-12 flex items-center gap-4">
           <Film className="w-12 h-12 text-primary" />
@@ -130,7 +122,7 @@ export default function Home() {
             <UserIcon className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">{user.email}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleSignOut} title="Cerrar sesión" className="hover:text-destructive">
+          <Button variant="ghost" size="icon" onClick={handleSignOut}>
             <LogOut className="w-5 h-5" />
           </Button>
         </div>
@@ -143,18 +135,17 @@ export default function Home() {
         
         <section className="w-full max-w-4xl mt-8">
           <form onSubmit={handleSearch} className="space-y-4">
-            <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl focus-within:border-primary/50 transition-all">
+            <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl">
               <Input
                 placeholder="Busca por género, humor o películas similares..."
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 px-4"
-                disabled={loading}
               />
               <Button 
                 type="submit" 
                 size="lg" 
-                className="h-14 md:px-8 bg-primary hover:bg-primary/90 rounded-xl gap-2 font-bold"
+                className="h-14 md:px-8 bg-primary rounded-xl gap-2 font-bold"
                 disabled={loading || !preferences.trim()}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Buscar</>}
@@ -162,54 +153,40 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap justify-center gap-4">
-              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
-                <Smile className="w-4 h-4 text-primary" />
-                <Select value={mood} onValueChange={setMood}>
-                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
-                    <SelectValue placeholder="Ánimo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Cualquier ánimo</SelectItem>
-                    <SelectItem value="Happy">Alegre</SelectItem>
-                    <SelectItem value="Sad">Triste / Melancólico</SelectItem>
-                    <SelectItem value="Exciting">Emocionante / Acción</SelectItem>
-                    <SelectItem value="Relaxing">Relajado / Tranquilo</SelectItem>
-                    <SelectItem value="Scary">Miedo / Tensión</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={mood} onValueChange={setMood}>
+                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
+                  <SelectValue placeholder="Ánimo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier ánimo</SelectItem>
+                  <SelectItem value="Happy">Alegre</SelectItem>
+                  <SelectItem value="Sad">Triste</SelectItem>
+                  <SelectItem value="Exciting">Acción</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
-                <Clock className="w-4 h-4 text-primary" />
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
-                    <SelectValue placeholder="Tiempo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Cualquier duración</SelectItem>
-                    <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
-                    <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
-                    <SelectItem value="Long movies">Películas largas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
+                  <SelectValue placeholder="Tiempo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier tiempo</SelectItem>
+                  <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
+                  <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <div className="flex items-center gap-2 bg-card/40 px-3 py-1.5 rounded-xl border border-border/30">
-                <MonitorPlay className="w-4 h-4 text-primary" />
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="w-[140px] border-none bg-transparent h-8 focus:ring-0">
-                    <SelectValue placeholder="Plataforma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Todas las plataformas</SelectItem>
-                    <SelectItem value="Netflix">Netflix</SelectItem>
-                    <SelectItem value="Disney+">Disney+</SelectItem>
-                    <SelectItem value="HBO Max">HBO Max</SelectItem>
-                    <SelectItem value="Prime Video">Prime Video</SelectItem>
-                    <SelectItem value="Apple TV+">Apple TV+</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={platform} onValueChange={setPlatform}>
+                <SelectTrigger className="w-[140px] bg-card/40 border-border/30">
+                  <SelectValue placeholder="Plataforma" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier plataforma</SelectItem>
+                  <SelectItem value="Netflix">Netflix</SelectItem>
+                  <SelectItem value="Disney+">Disney+</SelectItem>
+                  <SelectItem value="HBO Max">HBO Max</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </form>
         </section>
@@ -218,24 +195,18 @@ export default function Home() {
       <section className="w-full max-w-7xl px-6 pb-24 flex-1">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex justify-center mb-8">
-            <TabsList className="bg-secondary/40 p-1 rounded-xl h-12 border border-border/30">
-              <TabsTrigger value="explore" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
-                <Sparkle className="w-4 h-4" /> Recomendaciones
-              </TabsTrigger>
-              <TabsTrigger value="watchlist" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
-                <Bookmark className="w-4 h-4" /> Por ver
-              </TabsTrigger>
-              <TabsTrigger value="history" className="rounded-lg gap-2 px-6 h-10 data-[state=active]:bg-primary data-[state=active]:text-white">
-                <History className="w-4 h-4" /> Historial
-              </TabsTrigger>
+            <TabsList className="bg-secondary/40 h-12">
+              <TabsTrigger value="explore" className="px-6 data-[state=active]:bg-primary">Recomendaciones</TabsTrigger>
+              <TabsTrigger value="watchlist" className="px-6 data-[state=active]:bg-primary">Por ver</TabsTrigger>
+              <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary">Historial</TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="explore" className="mt-0 outline-none">
+          <TabsContent value="explore">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="aspect-[2/3] bg-card/30 rounded-2xl animate-pulse border border-border/10" />
+                  <div key={i} className="aspect-[2/3] bg-card/30 rounded-2xl animate-pulse" />
                 ))}
               </div>
             ) : recommendations ? (
@@ -245,10 +216,7 @@ export default function Home() {
                   return (
                     <MovieCard 
                       key={titleId} 
-                      movie={{
-                        ...movie,
-                        rating: watchedRatingsMap[titleId] || 0
-                      }} 
+                      movie={{...movie, rating: watchedRatingsMap[titleId] || 0}} 
                       index={idx}
                       isWatched={watchedIds.includes(titleId)}
                       isInWatchlist={watchlistIds.includes(titleId)}
@@ -259,12 +227,12 @@ export default function Home() {
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
                 <Sparkle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-medium">Usa el buscador para generar recomendaciones mágicas</p>
+                <p className="text-muted-foreground">Usa el buscador para generar recomendaciones</p>
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="watchlist" className="mt-0 outline-none">
+          <TabsContent value="watchlist">
             {watchlistMovies && watchlistMovies.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {watchlistMovies.map((movie, idx) => (
@@ -272,12 +240,8 @@ export default function Home() {
                     key={movie.id} 
                     movie={{
                       title: movie.title,
-                      year: movie.year,
                       posterUrl: movie.posterUrl,
-                      synopsis: movie.synopsis || "",
-                      duration: movie.duration,
-                      director: movie.director,
-                      actors: movie.actors,
+                      synopsis: "",
                     }} 
                     index={idx}
                     isInWatchlist={true}
@@ -287,12 +251,12 @@ export default function Home() {
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
                 <Bookmark className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-medium">Aún no tienes películas guardadas para ver luego</p>
+                <p className="text-muted-foreground">Tu lista de deseos está vacía</p>
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="history" className="mt-0 outline-none">
+          <TabsContent value="history">
             {watchedMovies && watchedMovies.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {watchedMovies.map((movie, idx) => (
@@ -300,12 +264,8 @@ export default function Home() {
                     key={movie.id} 
                     movie={{
                       title: movie.title,
-                      year: movie.year,
                       posterUrl: movie.posterUrl,
-                      synopsis: movie.synopsis || "",
-                      duration: movie.duration,
-                      director: movie.director,
-                      actors: movie.actors,
+                      synopsis: "",
                       rating: movie.rating
                     }} 
                     index={idx}
@@ -316,16 +276,12 @@ export default function Home() {
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
                 <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground font-medium">Aún no has marcado ninguna película como vista</p>
+                <p className="text-muted-foreground">Tu historial está vacío</p>
               </div>
             )}
           </TabsContent>
         </Tabs>
       </section>
-
-      <footer className="w-full py-10 border-t border-border/10 text-center text-muted-foreground/40 text-sm">
-        <p>© {new Date().getFullYear()} ReelRecs. IA que recuerda tus {watchedMovies?.length || 0} películas.</p>
-      </footer>
     </main>
   );
 }
