@@ -274,6 +274,7 @@ export default function Home() {
                       title: movie.title,
                       posterUrl: movie.posterUrl,
                       synopsis: "",
+                      duration: movie.duration
                     }} 
                     index={idx}
                     isInWatchlist={true}
@@ -298,6 +299,7 @@ export default function Home() {
                       title: movie.title,
                       posterUrl: movie.posterUrl,
                       synopsis: "",
+                      duration: movie.duration,
                       rating: movie.rating
                     }} 
                     index={idx}

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -6,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck } from 'lucide-react';
+import { Clapperboard, CheckCircle2, Eye, BookmarkPlus, BookmarkCheck, Clock } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -17,6 +16,7 @@ interface MovieCardProps {
     title: string;
     posterUrl: string;
     synopsis: string;
+    duration?: string;
     director?: string;
     actors?: string[];
     rating?: number;
@@ -46,9 +46,10 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       movieId: stableId,
       title: movie.title,
       posterUrl: movie.posterUrl,
+      duration: movie.duration || "",
       rating: newRating,
     }, { merge: true });
-  }, [user, db, stableId, movie.title, movie.posterUrl]);
+  }, [user, db, stableId, movie.title, movie.posterUrl, movie.duration]);
 
   const handleMarkAsWatched = () => {
     if (!user || !db) return;
@@ -65,6 +66,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       movieId: stableId,
       title: movie.title,
       posterUrl: movie.posterUrl,
+      duration: movie.duration || "",
       rating: movie.rating || 0,
       watchedAt: new Date().toISOString()
     }, { merge: true });
@@ -82,6 +84,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
         userId: user.uid,
         title: movie.title,
         posterUrl: movie.posterUrl,
+        duration: movie.duration || "",
         addedAt: new Date().toISOString(),
       }, { merge: true });
     }
@@ -178,12 +181,20 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
         )}
 
         <div className="space-y-2">
-          {movie.director && (
-            <div className="flex items-center gap-2 text-[10px]">
-              <Clapperboard className="w-3 h-3 text-accent" />
-              <span className="text-muted-foreground">{movie.director}</span>
-            </div>
-          )}
+          <div className="flex items-center justify-between">
+            {movie.director && (
+              <div className="flex items-center gap-2 text-[10px]">
+                <Clapperboard className="w-3 h-3 text-accent" />
+                <span className="text-muted-foreground">{movie.director}</span>
+              </div>
+            )}
+            {movie.duration && (
+              <div className="flex items-center gap-1.5 text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full">
+                <Clock className="w-3 h-3 text-primary" />
+                <span className="text-muted-foreground font-medium">{movie.duration}</span>
+              </div>
+            )}
+          </div>
           
           {movie.actors && movie.actors.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">

@@ -36,6 +36,7 @@ const RecommendMoviesOutputSchema = z.object({
         title: z.string().describe('The title of the movie.'),
         posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB or IMDb/Amazon format).'),
         synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
+        duration: z.string().describe('The duration of the movie in hours and minutes (e.g., "1h 45m").'),
         director: z.string().describe('The name of the movie\'s director.'),
         actors: z.array(z.string()).describe('A list of the main actors.'),
       })
@@ -82,12 +83,12 @@ STRICT EXCLUSION LIST (Do NOT recommend these):
 {{/each}}
 {{/if}}
 
-STRICT INSTRUCTIONS FOR POSTERS:
-1. You MUST provide the REAL official poster URL.
-2. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-3. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
-4. Use your knowledge to find the ACTUAL poster ID. 
-5. NO placeholders, NO picsum, NO unsplash.
+STRICT INSTRUCTIONS FOR CONTENT:
+1. You MUST provide the duration of the movie in hours and minutes (e.g., "2h 15m").
+2. You MUST provide the REAL official poster URL.
+3. PREFER TMDB format: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
+4. SECONDARY format (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
+5. Use your knowledge to find the ACTUAL poster ID. 
 6. EVERY single posterUrl must lead directly to a .jpg file of the ACTUAL movie poster.`,
 });
 
