@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, Clock, Smile, MonitorPlay } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,23 +47,11 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
     [movie.title]
   );
 
-  const handleUpdateRating = useCallback((newRating: number) => {
+  const handleUpdateRating = (newRating: number) => {
     if (!user || !db) return;
     const docRef = doc(db, 'users', user.uid, 'watchedMovies', stableId);
-    
-    // Al actualizar la calificación, nos aseguramos de mantener todos los datos
-    setDocumentNonBlocking(docRef, {
-      title: movie.title,
-      posterUrl: movie.posterUrl,
-      rating: newRating,
-      year: movie.year,
-      imdbRating: movie.imdbRating,
-      synopsis: movie.synopsis,
-      duration: movie.duration,
-      director: movie.director,
-      actors: movie.actors,
-    }, { merge: true });
-  }, [user, db, stableId, movie]);
+    setDocumentNonBlocking(docRef, { rating: newRating }, { merge: true });
+  };
 
   const handleMarkAsWatched = () => {
     if (!user || !db) return;
