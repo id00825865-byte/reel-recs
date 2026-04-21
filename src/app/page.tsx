@@ -256,7 +256,12 @@ export default function Home() {
                     movie={{
                       title: movie.title,
                       posterUrl: movie.posterUrl,
-                      synopsis: "",
+                      synopsis: movie.synopsis || "",
+                      year: movie.year,
+                      imdbRating: movie.imdbRating,
+                      duration: movie.duration,
+                      director: movie.director,
+                      actors: movie.actors,
                     }} 
                     index={idx}
                     isInWatchlist={true}
@@ -280,8 +285,13 @@ export default function Home() {
                     movie={{
                       title: movie.title,
                       posterUrl: movie.posterUrl,
-                      synopsis: "",
-                      rating: movie.rating
+                      synopsis: movie.synopsis || "",
+                      rating: movie.rating,
+                      year: movie.year,
+                      imdbRating: movie.imdbRating,
+                      duration: movie.duration,
+                      director: movie.director,
+                      actors: movie.actors,
                     }} 
                     index={idx}
                     isWatched={true}
