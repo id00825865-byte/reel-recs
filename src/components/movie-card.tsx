@@ -13,8 +13,16 @@ import {
   BookmarkCheck, 
   Clock, 
   Star,
-  Users
+  Users,
+  Info
 } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from '@/components/ui/dialog';
 import { useFirestore, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -139,6 +147,91 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
               <Star className="w-2.5 h-2.5 fill-black" /> IMDb {movie.imdbRating}
             </Badge>
           )}
+        </div>
+
+        {/* Botón de Información */}
+        <div className="absolute top-4 left-4 z-20">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 hover:bg-primary text-white transition-colors">
+                <Info className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl bg-card border-border/50 text-foreground overflow-hidden p-0 gap-0">
+              <div className="flex flex-col md:flex-row h-full">
+                <div className="w-full md:w-1/3 aspect-[2/3] relative">
+                  {!hasError ? (
+                    <Image
+                      src={movie.posterUrl}
+                      alt={movie.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Clapperboard className="w-12 h-12 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-6 md:w-2/3 flex flex-col gap-4 overflow-y-auto">
+                  <DialogHeader>
+                    <div className="flex justify-between items-start gap-2">
+                      <DialogTitle className="font-headline text-3xl font-black text-primary">
+                        {movie.title}
+                      </DialogTitle>
+                      {movie.year && (
+                        <span className="text-xl font-bold text-muted-foreground">{movie.year}</span>
+                      )}
+                    </div>
+                  </DialogHeader>
+
+                  <div className="flex flex-wrap gap-3">
+                    {movie.imdbRating && (
+                      <Badge className="bg-yellow-500 text-black font-bold gap-1 px-3 py-1">
+                        <Star className="w-4 h-4 fill-black" /> {movie.imdbRating} IMDb
+                      </Badge>
+                    )}
+                    {movie.duration && (
+                      <Badge variant="secondary" className="gap-1 px-3 py-1 font-bold">
+                        <Clock className="w-4 h-4" /> {movie.duration}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Sinopsis</h4>
+                      <p className="text-muted-foreground leading-relaxed italic">
+                        {movie.synopsis || "Sin sinopsis disponible."}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      {movie.director && (
+                        <div>
+                          <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Director</h4>
+                          <p className="font-medium">{movie.director}</p>
+                        </div>
+                      )}
+                      {movie.actors && movie.actors.length > 0 && (
+                        <div>
+                          <h4 className="text-xs uppercase tracking-widest font-black text-primary mb-1">Reparto</h4>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {movie.actors.map((actor, i) => (
+                              <Badge key={i} variant="outline" className="bg-secondary/30 border-border/40">
+                                {actor}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
