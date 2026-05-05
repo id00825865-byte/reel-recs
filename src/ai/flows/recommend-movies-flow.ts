@@ -6,47 +6,33 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+
 const RecommendMoviesInputSchema = z.object({
-  preferences: z
-    .string()
-    .describe('The user\'s natural language description of movie preferences.'),
-  excludeMovies: z
-    .array(z.string())
-    .optional()
-    .describe('A list of movie titles the user has already watched and should NOT be recommended.'),
-  mood: z
-    .string()
-    .optional()
-    .describe('The current mood of the user (e.g., Happy, Sad, Exciting, Scary, Romantic).'),
-  maxDuration: z
-    .string()
-    .optional()
-    .describe('The maximum duration the user is looking for (e.g., "Under 90 min", "More than 120 min").'),
-  platform: z
-    .string()
-    .optional()
-    .describe('The streaming platform the user has access to (e.g., Netflix, Disney+, HBO Max).'),
+  preferences: z.string(),
+  excludeMovies: z.array(z.string()).optional(),
+  mood: z.string().optional(),
+  maxDuration: z.string().optional(),
+  platform: z.string().optional(),
 });
 export type RecommendMoviesInput = z.infer<typeof RecommendMoviesInputSchema>;
 
 const RecommendMoviesOutputSchema = z.object({
-  movies: z
-    .array(
-      z.object({
-        title: z.string().describe('The title of the movie.'),
-        year: z.string().describe('The release year of the movie (e.g., "2023").'),
-        imdbRating: z.number().describe('The current IMDb rating of the movie (e.g., 8.5).'),
-        posterUrl: z.string().url().describe('A direct URL to the movie official poster (TMDB or IMDb/Amazon format).'),
-        synopsis: z.string().describe('A brief summary or synopsis of the movie.'),
-        duration: z.string().describe('The duration of the movie in hours and minutes (e.g., "1h 45m").'),
-        director: z.string().describe('The name of the movie\'s director.'),
-        actors: z.array(z.string()).describe('A list of the main actors.'),
-        platforms: z.array(z.string()).describe('A list of major streaming platforms where this movie is currently available (e.g., ["Netflix", "Prime Video"]).'),
-      })
-    )
-    .min(4)
-    .max(4)
-    .describe('An array of exactly 4 recommended movies.'),
+  movies: z.array(
+    z.object({
+      title: z.string(),
+      year: z.string(),
+      imdbRating: z.number(),
+      posterUrl: z.string().url(),
+      synopsis: z.string(),
+      duration: z.string(),
+      director: z.string(),
+      actors: z.array(z.string()),
+      platforms: z.array(z.string()),
+    })
+  ).min(4).max(4),
 });
 export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
@@ -55,6 +41,36 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
   return result;
 }
 
+
+// 🔥 FUNCIÓN REAL PARA POSTER (TMDB)
+async function getPosterFromTMDB(title: string, year?: string): Promise<string> {
+  try {
+    const url = new URL(`${TMDB_BASE_URL}/search/movie`);
+    url.searchParams.set('api_key', TMDB_API_KEY!);
+    url.searchParams.set('query', title);
+
+    if (year) {
+      url.searchParams.set('year', year);
+    }
+
+    const res = await fetch(url.toString());
+    const data = await res.json();
+
+    const movie = data.results?.[0];
+
+    if (movie?.poster_path) {
+      return `${TMDB_IMAGE_BASE}${movie.poster_path}`;
+    }
+
+    return 'https://via.placeholder.com/500x750?text=No+Image';
+  } catch (e) {
+    console.error('Poster error:', e);
+    return 'https://via.placeholder.com/500x750?text=No+Image';
+  }
+}
+
+
+// 🔥 PROMPT (NO LO TOCAMOS)
 const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
@@ -87,12 +103,12 @@ DO NOT RECOMMEND:
 INSTRUCTIONS:
 1. Provide the duration in hours and minutes (e.g., "2h 15m").
 2. Provide the REAL official poster URL from TMDB or Amazon.
-3. PREFER TMDB: https://image.tmdb.org/t/p/w500/<POSTER_ID>.jpg
-4. SECONDARY (Amazon/IMDb): https://m.media-amazon.com/images/M/<IMAGE_ID>.jpg
-5. Always include the release year and the real IMDb rating.
-6. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).`,
+3. Always include the release year and the real IMDb rating.
+4. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).`,
 });
 
+
+// 🔥 FLOW (AQUÍ está la magia)
 const recommendMoviesFlow = ai.defineFlow(
   {
     name: 'recommendMoviesFlow',
@@ -102,6 +118,21 @@ const recommendMoviesFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output) throw new Error('No se pudieron generar recomendaciones.');
-    return output;
+
+    // 👇 sustituimos SOLO el poster
+    const moviesWithRealPosters = await Promise.all(
+      output.movies.map(async (movie) => {
+        const realPoster = await getPosterFromTMDB(movie.title, movie.year);
+
+        return {
+          ...movie,
+          posterUrl: realPoster,
+        };
+      })
+    );
+
+    return {
+      movies: moviesWithRealPosters,
+    };
   }
 );
