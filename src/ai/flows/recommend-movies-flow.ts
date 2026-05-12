@@ -1,6 +1,7 @@
+
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with memory, high-fidelity poster retrieval, and platform availability.
+ * @fileOverview A movie recommendation AI agent with trailer retrieval and platform availability.
  */
 
 import {ai} from '@/ai/genkit';
@@ -31,6 +32,7 @@ const RecommendMoviesOutputSchema = z.object({
       director: z.string(),
       actors: z.array(z.string()),
       platforms: z.array(z.string()),
+      trailerUrl: z.string().url().optional(),
     })
   ).min(4).max(4),
 });
@@ -42,7 +44,6 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
 }
 
 
-// 🔥 FUNCIÓN REAL PARA POSTER (TMDB)
 async function getPosterFromTMDB(title: string, year?: string): Promise<string> {
   try {
     const url = new URL(`${TMDB_BASE_URL}/search/movie`);
@@ -70,7 +71,6 @@ async function getPosterFromTMDB(title: string, year?: string): Promise<string> 
 }
 
 
-// 🔥 PROMPT (NO LO TOCAMOS)
 const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
   input: {schema: RecommendMoviesInputSchema},
@@ -104,11 +104,11 @@ INSTRUCTIONS:
 1. Provide the duration in hours and minutes (e.g., "2h 15m").
 2. Provide the REAL official poster URL from TMDB or Amazon.
 3. Always include the release year and the real IMDb rating.
-4. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).`,
+4. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).
+5. Provide a valid YouTube trailer URL for the movie. If you're not sure, generate a search URL like "https://www.youtube.com/results?search_query=[title]+[year]+trailer".`,
 });
 
 
-// 🔥 FLOW (AQUÍ está la magia)
 const recommendMoviesFlow = ai.defineFlow(
   {
     name: 'recommendMoviesFlow',
@@ -119,7 +119,6 @@ const recommendMoviesFlow = ai.defineFlow(
     const {output} = await prompt(input);
     if (!output) throw new Error('No se pudieron generar recomendaciones.');
 
-    // 👇 sustituimos SOLO el poster
     const moviesWithRealPosters = await Promise.all(
       output.movies.map(async (movie) => {
         const realPoster = await getPosterFromTMDB(movie.title, movie.year);

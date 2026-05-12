@@ -69,6 +69,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "trailerUrl": {
+          "type": "string",
+          "format": "uri"
         }
       },
       "required": [
@@ -132,6 +136,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "trailerUrl": {
+          "type": "string",
+          "format": "uri"
         }
       },
       "required": [
@@ -188,6 +196,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "trailerUrl": {
+          "type": "string",
+          "format": "uri"
         }
       },
       "required": [

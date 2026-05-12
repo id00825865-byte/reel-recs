@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -15,7 +16,8 @@ import {
   Star,
   Users,
   Info,
-  Tv
+  Tv,
+  Youtube
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -41,6 +43,7 @@ interface MovieCardProps {
     actors?: string[];
     rating?: number;
     platforms?: string[];
+    trailerUrl?: string;
   };
   index: number;
   isWatched?: boolean;
@@ -83,6 +86,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
       director: movie.director,
       actors: movie.actors,
       platforms: movie.platforms || [],
+      trailerUrl: movie.trailerUrl || "",
     }, { merge: true });
   };
 
@@ -104,6 +108,7 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
         director: movie.director,
         actors: movie.actors,
         platforms: movie.platforms || [],
+        trailerUrl: movie.trailerUrl || "",
       }, { merge: true });
     }
   };
@@ -199,6 +204,13 @@ export function MovieCard({ movie, index, isWatched = false, isInWatchlist = fal
                       <Badge variant="secondary" className="gap-1 px-3 py-1.5 font-bold">
                         <Clock className="w-4 h-4" /> {movie.duration}
                       </Badge>
+                    )}
+                    {movie.trailerUrl && (
+                      <a href={movie.trailerUrl} target="_blank" rel="noopener noreferrer">
+                        <Badge className="bg-red-600 hover:bg-red-700 text-white font-bold gap-1 px-3 py-1.5 cursor-pointer">
+                          <Youtube className="w-4 h-4" /> Ver Tráiler
+                        </Badge>
+                      </a>
                     )}
                   </div>
 
