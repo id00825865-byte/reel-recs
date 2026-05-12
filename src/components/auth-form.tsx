@@ -17,22 +17,57 @@ export function AuthForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isResetting, setIsResetting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    initiateEmailSignIn(auth, email, password);
+    setIsLoading(true);
+    try {
+      await initiateEmailSignIn(auth, email, password);
+    } catch (error: any) {
+      let message = "Email o contraseña incorrectos.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        message = "Las credenciales no son válidas. Revisa tu email y contraseña.";
+      }
+      toast({
+        title: "Error al entrar",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    initiateEmailSignUp(auth, email, password);
+    setIsLoading(true);
+    try {
+      await initiateEmailSignUp(auth, email, password);
+    } catch (error: any) {
+      let message = "Hubo un problema al crear tu cuenta.";
+      if (error.code === 'auth/email-already-in-use') {
+        message = "Este email ya está registrado. Intenta iniciar sesión.";
+      } else if (error.code === 'auth/weak-password') {
+        message = "La contraseña es demasiado débil (mínimo 6 caracteres).";
+      } else if (error.code === 'auth/invalid-email') {
+        message = "El formato del email no es válido.";
+      }
+      toast({
+        title: "Error al registrarse",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = async () => {
     if (!email) {
       toast({
         title: "Email necesario",
-        description: "Por favor, escribe tu email en el campo de arriba para poder enviarte el enlace.",
+        description: "Escribe tu email arriba para enviarte el enlace de recuperación.",
         variant: "destructive",
       });
       return;
@@ -42,14 +77,13 @@ export function AuthForm() {
     try {
       await initiatePasswordReset(auth, email);
       toast({
-        title: "¡Proceso iniciado!",
-        description: "Si el email está registrado, recibirás un enlace en unos minutos. Revisa también tu carpeta de Spam.",
+        title: "Correo enviado",
+        description: "Si el email existe, recibirás instrucciones para cambiar tu contraseña.",
       });
     } catch (error: any) {
-      console.error("Error al resetear:", error);
       toast({
         title: "Error",
-        description: "Hubo un problema al intentar enviar el correo. Inténtalo de nuevo más tarde.",
+        description: "No se pudo enviar el correo. Inténtalo más tarde.",
         variant: "destructive",
       });
     } finally {
@@ -61,7 +95,7 @@ export function AuthForm() {
     <Card className="w-full max-w-md bg-card/50 backdrop-blur-xl border-border/50 shadow-2xl">
       <CardHeader>
         <CardTitle className="text-3xl font-headline text-center">Bienvenido a ReelRecs</CardTitle>
-        <CardDescription className="text-center">Inicia sesión para personalizar tus recomendaciones</CardDescription>
+        <CardDescription className="text-center">Personaliza tus recomendaciones guardando tus películas</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="login" className="w-full">
@@ -81,6 +115,7 @@ export function AuthForm() {
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   required 
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -89,10 +124,10 @@ export function AuthForm() {
                   <button 
                     type="button" 
                     onClick={handleForgotPassword}
-                    disabled={isResetting}
+                    disabled={isResetting || isLoading}
                     className="text-xs text-primary hover:underline font-bold disabled:opacity-50"
                   >
-                    {isResetting ? 'Enviando...' : '¿Has olvidado tu contraseña?'}
+                    {isResetting ? 'Enviando...' : '¿Olvidaste tu contraseña?'}
                   </button>
                 </div>
                 <Input 
@@ -101,9 +136,12 @@ export function AuthForm() {
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   required 
+                  disabled={isLoading}
                 />
               </div>
-              <Button type="submit" className="w-full h-12 text-lg">Iniciar Sesión</Button>
+              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading}>
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Iniciar Sesión"}
+              </Button>
             </form>
           </TabsContent>
 
@@ -118,6 +156,7 @@ export function AuthForm() {
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   required 
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -125,12 +164,16 @@ export function AuthForm() {
                 <Input 
                   id="signup-password" 
                   type="password" 
+                  placeholder="Mínimo 6 caracteres"
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   required 
+                  disabled={isLoading}
                 />
               </div>
-              <Button type="submit" className="w-full h-12 text-lg bg-accent hover:bg-accent/90">Crear Cuenta</Button>
+              <Button type="submit" className="w-full h-12 text-lg bg-accent hover:bg-accent/90" disabled={isLoading}>
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Crear Cuenta"}
+              </Button>
             </form>
           </TabsContent>
         </Tabs>
