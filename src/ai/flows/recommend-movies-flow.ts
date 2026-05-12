@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview A movie recommendation AI agent with trailer retrieval and platform availability.
+ * @fileOverview A movie recommendation AI agent with reliable trailer search URLs.
  */
 
 import {ai} from '@/ai/genkit';
@@ -43,7 +43,6 @@ export async function recommendMovies(input: RecommendMoviesInput): Promise<Reco
   return result;
 }
 
-
 async function getPosterFromTMDB(title: string, year?: string): Promise<string> {
   try {
     const url = new URL(`${TMDB_BASE_URL}/search/movie`);
@@ -69,7 +68,6 @@ async function getPosterFromTMDB(title: string, year?: string): Promise<string> 
     return 'https://via.placeholder.com/500x750?text=No+Image';
   }
 }
-
 
 const prompt = ai.definePrompt({
   name: 'recommendMoviesPrompt',
@@ -102,12 +100,12 @@ DO NOT RECOMMEND:
 
 INSTRUCTIONS:
 1. Provide the duration in hours and minutes (e.g., "2h 15m").
-2. Provide the REAL official poster URL from TMDB or Amazon.
-3. Always include the release year and the real IMDb rating.
-4. List the likely streaming platforms where the movie is available based on your knowledge (Netflix, HBO Max, Disney+, Prime Video, etc.).
-5. Provide a valid YouTube trailer URL for the movie. If you're not sure, generate a search URL like "https://www.youtube.com/results?search_query=[title]+[year]+trailer".`,
+2. Provide a REAL release year and the real IMDb rating.
+3. List the likely streaming platforms (Netflix, Disney+, etc.).
+4. CRITICAL FOR TRAILERS: To ensure the trailer is always available, for the trailerUrl field, ALWAYS generate a YouTube search URL in this exact format: 
+   https://www.youtube.com/results?search_query=[MOVIE+TITLE]+[YEAR]+official+trailer
+   Do NOT attempt to guess a direct video ID. Use '+' for spaces.`,
 });
-
 
 const recommendMoviesFlow = ai.defineFlow(
   {
