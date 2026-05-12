@@ -32,7 +32,7 @@ export function AuthForm() {
     if (!email) {
       toast({
         title: "Email necesario",
-        description: "Escribe tu email arriba para poder enviarte el enlace de recuperación.",
+        description: "Por favor, escribe tu email en el campo de arriba para poder enviarte el enlace.",
         variant: "destructive",
       });
       return;
@@ -42,13 +42,14 @@ export function AuthForm() {
     try {
       await initiatePasswordReset(auth, email);
       toast({
-        title: "Correo enviado",
-        description: "Revisa tu bandeja de entrada para restablecer tu contraseña.",
+        title: "¡Proceso iniciado!",
+        description: "Si el email está registrado, recibirás un enlace en unos minutos. Revisa también tu carpeta de Spam.",
       });
     } catch (error: any) {
+      console.error("Error al resetear:", error);
       toast({
         title: "Error",
-        description: "No se pudo enviar el correo de recuperación. Verifica el email.",
+        description: "Hubo un problema al intentar enviar el correo. Inténtalo de nuevo más tarde.",
         variant: "destructive",
       });
     } finally {
@@ -94,7 +95,13 @@ export function AuthForm() {
                     {isResetting ? 'Enviando...' : '¿Has olvidado tu contraseña?'}
                   </button>
                 </div>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input 
+                  id="password" 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                />
               </div>
               <Button type="submit" className="w-full h-12 text-lg">Iniciar Sesión</Button>
             </form>
@@ -104,11 +111,24 @@ export function AuthForm() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
-                <Input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input 
+                  id="signup-email" 
+                  type="email" 
+                  placeholder="tu@email.com"
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Contraseña</Label>
-                <Input id="signup-password" type="password" value={email} onChange={(e) => setPassword(e.target.value)} required />
+                <Input 
+                  id="signup-password" 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                />
               </div>
               <Button type="submit" className="w-full h-12 text-lg bg-accent hover:bg-accent/90">Crear Cuenta</Button>
             </form>
