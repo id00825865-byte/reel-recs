@@ -70,45 +70,48 @@ export default function Home() {
   
   const { data: userData } = useDoc(userDocRef);
 
-  // Lógica de administrador con bypass por correo
+  // Lógica de administrador definitiva: Base de datos O bypass por correo
   const isAdmin = useMemo(() => {
     if (!user) return false;
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Sincronización del perfil del usuario (Reforzada para evitar sobrescrituras de admin)
+  // Sincronización del perfil del usuario (Reforzada y corregida)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
+      const isBypassEmail = user.email === 'id00825865@usal.es';
       
-      const realCreationDate = user.metadata.creationTime 
-        ? new Date(user.metadata.creationTime).toISOString() 
-        : new Date().toISOString();
-
       const syncProfile = async () => {
         const snap = await getDoc(userRef);
-        
-        // Datos básicos que siempre se actualizan
-        const basicData: any = {
+        const realCreationDate = user.metadata.creationTime 
+          ? new Date(user.metadata.creationTime).toISOString() 
+          : new Date().toISOString();
+
+        const basicUpdate: any = {
           email: user.email,
           id: user.uid,
           lastLogin: serverTimestamp(),
         };
 
+        // Si es el correo de bypass, nos aseguramos de que el booleano en DB sea true
+        if (isBypassEmail) {
+          basicUpdate.isAdmin = true;
+        }
+
         if (!snap.exists()) {
-          // Si el documento NO existe, creamos el perfil inicial
           const initialData = {
-            ...basicData,
+            ...basicUpdate,
             createdAt: realCreationDate,
-            isAdmin: user.email === 'id00825865@usal.es',
+            isAdmin: isBypassEmail,
             status: 'active',
             recommendationCount: 0,
             isRestricted: false,
           };
           setDocumentNonBlocking(userRef, initialData, { merge: true });
         } else {
-          // Si YA existe, SOLO actualizamos lastLogin e email para no machacar los cambios del admin
-          setDocumentNonBlocking(userRef, basicData, { merge: true });
+          // No sobreescribimos isAdmin ni isRestricted de otros usuarios, solo el del bypass
+          setDocumentNonBlocking(userRef, basicUpdate, { merge: true });
         }
       };
 
@@ -129,7 +132,7 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración - Consulta sin filtros para ver a todos
+  // Panel de administración
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
