@@ -45,10 +45,11 @@ export default function Home() {
 
   // Asegurar que el perfil del usuario existe en Firestore sin sobrescribir datos existentes
   useEffect(() => {
-    // Solo actuamos si el usuario está autenticado, la carga inicial de auth terminó,
-    // la carga del documento de Firestore terminó Y el documento es null (no existe)
+    // Solo actuamos si el usuario está autenticado, la carga de auth terminó
+    // Y Firestore nos confirma explícitamente que el documento no existe (userData === null)
     if (user && db && !isUserDataLoading && userData === null && !isUserLoading) {
-      setDoc(doc(db, 'users', user.uid), {
+      const newUserRef = doc(db, 'users', user.uid);
+      setDoc(newUserRef, {
         email: user.email,
         createdAt: serverTimestamp(),
         id: user.uid,
@@ -85,7 +86,7 @@ export default function Home() {
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !userData?.isAdmin) return null;
     return query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-  }, [db, userData]);
+  }, [db, userData?.isAdmin]);
   const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
   const handleSearch = async (e: React.FormEvent) => {
