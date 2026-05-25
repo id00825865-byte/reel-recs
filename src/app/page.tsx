@@ -68,11 +68,17 @@ export default function Home() {
   
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
+  // Lógica de administrador con bypass por correo para cuotas agotadas
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
+  }, [userData, user]);
+
   // Estadísticas globales para el admin
   const statsDocRef = useMemoFirebase(() => {
-    if (!db || !userData?.isAdmin) return null;
+    if (!db || !isAdmin) return null;
     return doc(db, 'globalStats', todayStr);
-  }, [db, userData?.isAdmin, todayStr]);
+  }, [db, isAdmin, todayStr]);
   const { data: globalTodayStats } = useDoc(statsDocRef);
 
   // Sincronización del perfil del usuario
@@ -90,7 +96,7 @@ export default function Home() {
           createdAt: realCreationDate,
           lastLogin: serverTimestamp(),
           id: user.uid,
-          isAdmin: userData?.isAdmin || false,
+          isAdmin: isAdmin, // Usamos la lógica de bypass aquí también para guardarlo
           status: userData?.status || 'active',
           recommendationCount: userData?.recommendationCount || 0,
           isRestricted: userData?.isRestricted || false
@@ -99,11 +105,11 @@ export default function Home() {
         updateDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
           email: user.email,
-          createdAt: userData.createdAt || realCreationDate // Aseguramos que no se pierda la fecha real
+          createdAt: userData.createdAt || realCreationDate
         });
       }
     }
-  }, [user, db, userData, isUserDataLoading, isUserLoading]);
+  }, [user, db, userData, isUserDataLoading, isUserLoading, isAdmin]);
 
   // Consultas de películas
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -120,9 +126,9 @@ export default function Home() {
 
   // Panel de administración
   const allUsersQuery = useMemoFirebase(() => {
-    if (!db || !userData?.isAdmin) return null;
+    if (!db || !isAdmin) return null;
     return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
-  }, [db, userData?.isAdmin]);
+  }, [db, isAdmin]);
   const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
   const watchedRatingsMap = useMemo(() => {
@@ -203,7 +209,6 @@ export default function Home() {
 
   const handleSignOut = () => signOut(auth);
 
-  // Función para determinar si un usuario está en línea (últimos 5 minutos)
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
     const lastLoginDate = lastLogin.seconds ? new Date(lastLogin.seconds * 1000) : new Date(lastLogin);
@@ -254,13 +259,13 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
-            {userData?.isAdmin ? (
+            {isAdmin ? (
               <ShieldCheck className="w-4 h-4 text-accent animate-pulse" />
             ) : (
               <UserIcon className="w-4 h-4 text-primary" />
             )}
             <span className="text-sm font-medium">{user.email}</span>
-            {userData?.isAdmin && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">ADMIN</span>}
+            {isAdmin && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">ADMIN</span>}
           </div>
           <Button variant="ghost" size="icon" onClick={handleSignOut}>
             <LogOut className="w-5 h-5" />
@@ -359,7 +364,7 @@ export default function Home() {
               <TabsTrigger value="explore" className="px-6 data-[state=active]:bg-primary">Recomendaciones</TabsTrigger>
               <TabsTrigger value="watchlist" className="px-6 data-[state=active]:bg-primary">Por ver</TabsTrigger>
               <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary">Historial</TabsTrigger>
-              {userData?.isAdmin && (
+              {isAdmin && (
                 <TabsTrigger value="admin" className="px-6 data-[state=active]:bg-accent text-accent data-[state=active]:text-white">
                   <ShieldCheck className="w-4 h-4 mr-2" /> Panel Admin
                 </TabsTrigger>
@@ -458,7 +463,7 @@ export default function Home() {
             )}
           </TabsContent>
 
-          {userData?.isAdmin && (
+          {isAdmin && (
             <TabsContent value="admin">
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -620,4 +625,3 @@ export default function Home() {
     </main>
   );
 }
-
