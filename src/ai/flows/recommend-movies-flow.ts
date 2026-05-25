@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A movie recommendation AI agent with reliable trailer search URLs.
@@ -10,6 +9,9 @@ import {z} from 'genkit';
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+
+// No exportamos esta constante para evitar el error de Next.js en archivos "use server"
+const maxDuration = 60;
 
 const RecommendMoviesInputSchema = z.object({
   preferences: z.string(),
@@ -39,33 +41,42 @@ const RecommendMoviesOutputSchema = z.object({
 export type RecommendMoviesOutput = z.infer<typeof RecommendMoviesOutputSchema>;
 
 export async function recommendMovies(input: RecommendMoviesInput): Promise<RecommendMoviesOutput> {
-  const result = await recommendMoviesFlow(input);
-  return result;
+  try {
+    const result = await recommendMoviesFlow(input);
+    return result;
+  } catch (error: any) {
+    console.error('Error in recommendMovies server action:', error);
+    throw new Error(error.message || 'Error al generar recomendaciones.');
+  }
 }
 
 async function getPosterFromTMDB(title: string, year?: string): Promise<string> {
+  if (!TMDB_API_KEY || TMDB_API_KEY === 'tu_tmdb_api_key_aqui') {
+    return `https://picsum.photos/seed/${encodeURIComponent(title)}/500/750`;
+  }
+
   try {
     const url = new URL(`${TMDB_BASE_URL}/search/movie`);
-    url.searchParams.set('api_key', TMDB_API_KEY!);
+    url.searchParams.set('api_key', TMDB_API_KEY);
     url.searchParams.set('query', title);
 
     if (year) {
       url.searchParams.set('year', year);
     }
 
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
+    if (!res.ok) throw new Error('TMDB request failed');
+    
     const data = await res.json();
-
     const movie = data.results?.[0];
 
     if (movie?.poster_path) {
       return `${TMDB_IMAGE_BASE}${movie.poster_path}`;
     }
 
-    return 'https://via.placeholder.com/500x750?text=No+Image';
+    return `https://picsum.photos/seed/${encodeURIComponent(title)}/500/750`;
   } catch (e) {
-    console.error('Poster error:', e);
-    return 'https://via.placeholder.com/500x750?text=No+Image';
+    return `https://picsum.photos/seed/${encodeURIComponent(title)}/500/750`;
   }
 }
 
@@ -92,7 +103,7 @@ PLATFORM: {{{platform}}}
 {{/if}}
 
 {{#if excludeMovies}}
-DO NOT RECOMMEND:
+DO NOT RECOMMEND estos títulos (ya vistos):
 {{#each excludeMovies}}
 - {{{this}}}
 {{/each}}
@@ -102,9 +113,9 @@ INSTRUCTIONS:
 1. Provide the duration in hours and minutes (e.g., "2h 15m").
 2. Provide a REAL release year and the real IMDb rating.
 3. List the likely streaming platforms (Netflix, Disney+, etc.).
-4. CRITICAL FOR TRAILERS: To ensure the trailer is always available, for the trailerUrl field, ALWAYS generate a YouTube search URL in this exact format: 
+4. CRITICAL FOR TRAILERS: ALWAYS generate a YouTube search URL in this exact format: 
    https://www.youtube.com/results?search_query=[MOVIE+TITLE]+[YEAR]+official+trailer
-   Do NOT attempt to guess a direct video ID. Use '+' for spaces.`,
+   Use '+' for spaces.`,
 });
 
 const recommendMoviesFlow = ai.defineFlow(
