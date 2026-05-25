@@ -32,7 +32,8 @@ import {
   Zap,
   ZapOff,
   AlertTriangle,
-  CalendarDays
+  CalendarDays,
+  Circle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -79,13 +80,11 @@ export default function Home() {
     if (user && db && !isUserDataLoading && !isUserLoading) {
       const userRef = doc(db, 'users', user.uid);
       
-      // Obtenemos la fecha de creación real desde los metadatos de Auth
       const realCreationDate = user.metadata.creationTime 
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
       if (!userData || !userData.createdAt) {
-        // Si no tiene perfil o no tiene fecha, lo creamos con la fecha real de Auth
         setDocumentNonBlocking(userRef, {
           email: user.email,
           createdAt: realCreationDate,
@@ -97,10 +96,10 @@ export default function Home() {
           isRestricted: userData?.isRestricted || false
         }, { merge: true });
       } else {
-        // Si ya existe, solo actualizamos el último login
         updateDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
           email: user.email,
+          createdAt: userData.createdAt || realCreationDate // Aseguramos que no se pierda la fecha real
         });
       }
     }
@@ -203,6 +202,14 @@ export default function Home() {
   };
 
   const handleSignOut = () => signOut(auth);
+
+  // Función para determinar si un usuario está en línea (últimos 5 minutos)
+  const isOnline = (lastLogin: any) => {
+    if (!lastLogin) return false;
+    const lastLoginDate = lastLogin.seconds ? new Date(lastLogin.seconds * 1000) : new Date(lastLogin);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return lastLoginDate > fiveMinutesAgo;
+  };
 
   if (isUserLoading || (user && isUserDataLoading)) {
     return (
@@ -515,7 +522,20 @@ export default function Home() {
                               <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col">
-                                    <span className="font-bold">{u.email || 'Sin email'}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold">{u.email || 'Sin email'}</span>
+                                      {isOnline(u.lastLogin) ? (
+                                        <div className="flex items-center gap-1 bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
+                                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                          En línea
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-1 bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
+                                          <Circle className="w-1.5 h-1.5 fill-muted-foreground" />
+                                          Off
+                                        </div>
+                                      )}
+                                    </div>
                                     <span className="text-[10px] font-mono text-muted-foreground">{u.id}</span>
                                   </div>
                                 </td>
@@ -600,3 +620,4 @@ export default function Home() {
     </main>
   );
 }
+
