@@ -32,7 +32,9 @@ import {
   Zap,
   ZapOff,
   AlertTriangle,
-  CalendarDays
+  CalendarDays,
+  ShieldAlert,
+  CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -40,6 +42,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc 
 import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { cn } from '@/lib/utils';
 
 const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
 
@@ -73,7 +76,7 @@ export default function Home() {
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Sincronización del perfil del usuario (Mejorada para evitar reseteos)
+  // Sincronización del perfil del usuario (Reforzada para evitar sobrescrituras de admin)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
@@ -82,27 +85,31 @@ export default function Home() {
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
-      // Solo sincronizamos campos básicos. NO sobreescribimos contadores o permisos aquí.
       const syncProfile = async () => {
         const snap = await getDoc(userRef);
-        const currentData = snap.data();
-
-        const updateData: any = {
+        
+        // Datos básicos que siempre se actualizan
+        const basicData: any = {
           email: user.email,
           id: user.uid,
           lastLogin: serverTimestamp(),
         };
 
-        // Solo establecemos valores iniciales si el documento NO existe
         if (!snap.exists()) {
-          updateData.createdAt = realCreationDate;
-          updateData.isAdmin = user.email === 'id00825865@usal.es';
-          updateData.status = 'active';
-          updateData.recommendationCount = 0;
-          updateData.isRestricted = false;
+          // Si el documento NO existe, creamos el perfil inicial
+          const initialData = {
+            ...basicData,
+            createdAt: realCreationDate,
+            isAdmin: user.email === 'id00825865@usal.es',
+            status: 'active',
+            recommendationCount: 0,
+            isRestricted: false,
+          };
+          setDocumentNonBlocking(userRef, initialData, { merge: true });
+        } else {
+          // Si YA existe, SOLO actualizamos lastLogin e email para no machacar los cambios del admin
+          setDocumentNonBlocking(userRef, basicData, { merge: true });
         }
-
-        setDocumentNonBlocking(userRef, updateData, { merge: true });
       };
 
       syncProfile();
@@ -122,27 +129,21 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración - Consulta simplificada para ver a todos
+  // Panel de administración - Consulta sin filtros para ver a todos
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios en el cliente
+  // Ordenamos los usuarios: Primero el usuario actual, luego el resto
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
     
     const currentUserProfile = rawUsers.find(u => u.id === user.uid);
     const otherUsers = rawUsers.filter(u => u.id !== user.uid);
 
-    const sortedOthers = [...otherUsers].sort((a, b) => {
-      const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : new Date(a.lastLogin || 0).getTime();
-      const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : new Date(b.lastLogin || 0).getTime();
-      return dateB - dateA;
-    });
-
-    return currentUserProfile ? [currentUserProfile, ...sortedOthers] : sortedOthers;
+    return currentUserProfile ? [currentUserProfile, ...otherUsers] : otherUsers;
   }, [rawUsers, user]);
 
   // Estadísticas globales para el admin
@@ -189,7 +190,6 @@ export default function Home() {
       setRecommendations(results);
       
       if (db && user) {
-        // Actualización atómica de estadísticas
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
         const userRef = doc(db, 'users', user.uid);
@@ -252,7 +252,7 @@ export default function Home() {
     );
   }
 
-  if (!user || userData?.status === 'banned') {
+  if (!user || (userData?.status === 'banned' && !isAdmin)) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
         <Toaster />
@@ -265,7 +265,7 @@ export default function Home() {
             <CardHeader className="text-center">
               <Ban className="w-12 h-12 text-destructive mx-auto mb-4" />
               <CardTitle>Cuenta Suspendida</CardTitle>
-              <p className="text-muted-foreground mt-2">Tu acceso ha sido restringido.</p>
+              <p className="text-muted-foreground mt-2">Tu acceso ha sido restringido por un administrador.</p>
               <Button variant="outline" className="mt-4" onClick={handleSignOut}>Cerrar Sesión</Button>
             </CardHeader>
           </Card>
@@ -575,12 +575,34 @@ export default function Home() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="flex flex-col gap-1">
-                                    <div className="flex gap-1">
-                                      {u.isAdmin && <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold">ADMIN</span>}
-                                      {u.isRestricted && <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold">PAUSADO</span>}
-                                      {u.status === 'active' && !u.isAdmin && !u.isRestricted && <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full text-[10px] font-bold">ACTIVO</span>}
-                                    </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {u.isAdmin ? (
+                                      <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                        <ShieldCheck className="w-3 h-3" /> ADMIN
+                                      </span>
+                                    ) : (
+                                      <span className="bg-secondary/40 text-muted-foreground px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                        <UserIcon className="w-3 h-3" /> USUARIO
+                                      </span>
+                                    )}
+                                    
+                                    {u.isRestricted ? (
+                                      <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                        <ZapOff className="w-3 h-3" /> IA PAUSADA
+                                      </span>
+                                    ) : (
+                                      <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                        <Zap className="w-3 h-3" /> IA OK
+                                      </span>
+                                    )}
+
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1",
+                                      u.status === 'active' ? "bg-blue-500/20 text-blue-500" : "bg-red-500/20 text-red-500"
+                                    )}>
+                                      {u.status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                                      {u.status === 'active' ? 'ACTIVO' : 'BANEADO'}
+                                    </span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -591,7 +613,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <Clock className="w-3 h-3 text-accent" />
-                                      <span>Última vez: {u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
+                                      <span>Visto: {u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
                                     </div>
                                   </div>
                                 </td>
