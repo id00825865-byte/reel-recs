@@ -28,14 +28,13 @@ import {
   UserPlus, 
   UserMinus,
   Ban,
-  CheckCircle,
-  Clapperboard,
+  MessageSquareShare,
   Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, setDoc, deleteDoc, getDocs, increment } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -55,6 +54,8 @@ export default function Home() {
   const db = useFirestore();
   const auth = useAuth();
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
   // Documento del perfil del usuario actual
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -63,33 +64,37 @@ export default function Home() {
   
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
+  // Estadísticas globales para el admin
+  const statsDocRef = useMemoFirebase(() => {
+    if (!db || !userData?.isAdmin) return null;
+    return doc(db, 'globalStats', todayStr);
+  }, [db, userData?.isAdmin, todayStr]);
+  const { data: globalTodayStats } = useDoc(statsDocRef);
+
   // Efecto para asegurar que el perfil del usuario existe y registrar su conexión
   useEffect(() => {
     if (user && db && !isUserDataLoading && !isUserLoading) {
       const userRef = doc(db, 'users', user.uid);
-      
-      // Obtenemos la fecha de creación REAL de Firebase Auth
       const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
       
-      if (!userData) {
-        // Si no existe el documento, lo creamos con la fecha de creación real del Auth
+      // Si el documento no existe, o si existe pero la fecha de creación parece incorrecta (ej: se guardó mal antes)
+      if (!userData || !userData.createdAt || (userData.createdAt.startsWith(todayStr) && new Date(user.metadata.creationTime).getDate() !== new Date().getDate())) {
         setDocumentNonBlocking(userRef, {
           email: user.email,
           createdAt: creationTime.toISOString(),
           lastLogin: serverTimestamp(),
           id: user.uid,
-          isAdmin: false,
-          status: 'active'
+          isAdmin: userData?.isAdmin || false,
+          status: userData?.status || 'active'
         }, { merge: true });
       } else {
-        // Si existe, SOLO actualizamos el último login, nunca la fecha de creación
         setDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
           email: user.email,
         }, { merge: true });
       }
     }
-  }, [user, db, !!userData, isUserDataLoading, isUserLoading]);
+  }, [user, db, userData, isUserDataLoading, isUserLoading, todayStr]);
 
   // Consultas de películas para el usuario logueado
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -111,7 +116,6 @@ export default function Home() {
   }, [db, userData?.isAdmin]);
   const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Mapeos de IDs para UI
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
@@ -137,6 +141,13 @@ export default function Home() {
         platform: platform !== 'any' ? platform : undefined,
       });
       setRecommendations(results);
+      
+      // Registrar la consulta en las estadísticas globales
+      if (db) {
+        const statRef = doc(db, 'globalStats', todayStr);
+        setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
+      }
+      
       setActiveTab('explore');
     } catch (error: any) {
       toast({ title: "Error en la búsqueda", description: error.message, variant: "destructive" });
@@ -420,12 +431,12 @@ export default function Home() {
                   <Card className="bg-card/50 border-border/30">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-green-500" /> Actividad Global
+                        <MessageSquareShare className="w-4 h-4 text-green-500" /> Consultas IA (Hoy)
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-4xl font-black">Activo</span>
-                      <p className="text-xs text-muted-foreground mt-1">Sincronización en tiempo real</p>
+                      <span className="text-4xl font-black">{globalTodayStats?.recommendationRequests || 0}</span>
+                      <p className="text-xs text-muted-foreground mt-1">Interacciones con Gemini</p>
                     </CardContent>
                   </Card>
 

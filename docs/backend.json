@@ -24,6 +24,13 @@
         "isAdmin": {
           "type": "boolean",
           "description": "True if the user has administrative privileges."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "banned"]
+        },
+        "lastLogin": {
+          "type": "object"
         }
       },
       "required": [
@@ -31,58 +38,16 @@
         "email"
       ]
     },
-    "Movie": {
+    "GlobalStats": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Movie",
+      "title": "GlobalStats",
       "type": "object",
-      "description": "Core movie details used across the app.",
+      "description": "Daily global metrics for the application.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "title": {
-          "type": "string"
-        },
-        "synopsis": {
-          "type": "string"
-        },
-        "director": {
-          "type": "string"
-        },
-        "actors": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "posterUrl": {
-          "type": "string",
-          "format": "uri"
-        },
-        "year": {
-          "type": "string"
-        },
-        "imdbRating": {
+        "recommendationRequests": {
           "type": "number"
-        },
-        "duration": {
-          "type": "string"
-        },
-        "platforms": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "trailerUrl": {
-          "type": "string",
-          "format": "uri"
         }
-      },
-      "required": [
-        "title",
-        "posterUrl"
-      ]
+      }
     },
     "UserWatchedMovie": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -226,6 +191,15 @@
           "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
+          }
+        }
+      },
+      {
+        "path": "/globalStats/{date}",
+        "definition": {
+          "entityName": "GlobalStats",
+          "schema": {
+            "$ref": "#/backend/entities/GlobalStats"
           }
         }
       },
