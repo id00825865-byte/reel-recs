@@ -33,7 +33,6 @@ import {
   ZapOff,
   AlertTriangle,
   CalendarDays,
-  ShieldAlert,
   CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -62,11 +61,11 @@ export default function Home() {
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  // Documento del perfil del usuario actual
+  // Documento del perfil del usuario actual - Vinculado estrictamente al UID
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, 'users', user.uid);
-  }, [db, user]);
+  }, [db, user?.uid]);
   
   const { data: userData } = useDoc(userDocRef);
 
@@ -74,44 +73,50 @@ export default function Home() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
-  }, [userData, user]);
+  }, [userData?.isAdmin, user?.email]);
 
-  // Sincronización del perfil del usuario (Reforzada y corregida)
+  // Sincronización del perfil del usuario (Reforzada para evitar sobrescrituras accidentales)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
       const isBypassEmail = user.email === 'id00825865@usal.es';
       
       const syncProfile = async () => {
-        const snap = await getDoc(userRef);
-        const realCreationDate = user.metadata.creationTime 
-          ? new Date(user.metadata.creationTime).toISOString() 
-          : new Date().toISOString();
-
-        const basicUpdate: any = {
-          email: user.email,
-          id: user.uid,
-          lastLogin: serverTimestamp(),
-        };
-
-        // Si es el correo de bypass, nos aseguramos de que el booleano en DB sea true
-        if (isBypassEmail) {
-          basicUpdate.isAdmin = true;
-        }
-
-        if (!snap.exists()) {
-          const initialData = {
-            ...basicUpdate,
-            createdAt: realCreationDate,
-            isAdmin: isBypassEmail,
-            status: 'active',
-            recommendationCount: 0,
-            isRestricted: false,
+        try {
+          const snap = await getDoc(userRef);
+          
+          const updateData: any = {
+            email: user.email,
+            id: user.uid,
+            lastLogin: serverTimestamp(),
           };
-          setDocumentNonBlocking(userRef, initialData, { merge: true });
-        } else {
-          // No sobreescribimos isAdmin ni isRestricted de otros usuarios, solo el del bypass
-          setDocumentNonBlocking(userRef, basicUpdate, { merge: true });
+
+          if (isBypassEmail) {
+            updateData.isAdmin = true;
+          }
+
+          if (!snap.exists()) {
+            // Documento nuevo
+            const initialData = {
+              ...updateData,
+              createdAt: new Date().toISOString(),
+              isAdmin: isBypassEmail,
+              status: 'active',
+              recommendationCount: 0,
+              isRestricted: false,
+            };
+            setDocumentNonBlocking(userRef, initialData, { merge: true });
+          } else {
+            // Documento existente: SOLO actualizamos lo básico para no borrar isAdmin o isRestricted
+            setDocumentNonBlocking(userRef, updateData, { merge: true });
+          }
+        } catch (e) {
+          // En caso de error de cuota en el read, intentamos al menos el set merge
+          setDocumentNonBlocking(userRef, {
+            email: user.email,
+            id: user.uid,
+            lastLogin: serverTimestamp(),
+          }, { merge: true });
         }
       };
 
@@ -123,31 +128,38 @@ export default function Home() {
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
-  }, [db, user]);
+  }, [db, user?.uid]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
   const watchlistQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
-  }, [db, user]);
+  }, [db, user?.uid]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración
+  // Panel de administración - Consulta de TODOS los usuarios sin filtros
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios: Primero el usuario actual, luego el resto
+  // Ordenamos los usuarios en el cliente para asegurar que todos aparezcan
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
     
+    // Filtramos y ordenamos: Tú primero, luego el resto por fecha de login descendente
     const currentUserProfile = rawUsers.find(u => u.id === user.uid);
-    const otherUsers = rawUsers.filter(u => u.id !== user.uid);
+    const otherUsers = rawUsers
+      .filter(u => u.id !== user.uid)
+      .sort((a, b) => {
+        const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : 0;
+        const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : 0;
+        return dateB - dateA;
+      });
 
     return currentUserProfile ? [currentUserProfile, ...otherUsers] : otherUsers;
-  }, [rawUsers, user]);
+  }, [rawUsers, user?.uid]);
 
   // Estadísticas globales para el admin
   const statsDocRef = useMemoFirebase(() => {
@@ -230,7 +242,12 @@ export default function Home() {
     toast({ title: "Usuario eliminado", description: "El perfil ha sido borrado." });
   };
 
-  const handleSignOut = () => signOut(auth);
+  const handleSignOut = () => {
+    signOut(auth).then(() => {
+      setActiveTab('explore');
+      setRecommendations(null);
+    });
+  };
 
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
