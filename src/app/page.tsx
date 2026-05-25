@@ -74,42 +74,29 @@ export default function Home() {
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Estadísticas globales para el admin
-  const statsDocRef = useMemoFirebase(() => {
-    if (!db || !isAdmin) return null;
-    return doc(db, 'globalStats', todayStr);
-  }, [db, isAdmin, todayStr]);
-  const { data: globalTodayStats } = useDoc(statsDocRef);
-
-  // Sincronización del perfil del usuario
+  // Sincronización del perfil del usuario (Mejorada para persistencia)
   useEffect(() => {
-    if (user && db && !isUserDataLoading && !isUserLoading) {
+    if (user && db) {
       const userRef = doc(db, 'users', user.uid);
       
       const realCreationDate = user.metadata.creationTime 
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
-      if (!userData || !userData.createdAt) {
-        setDocumentNonBlocking(userRef, {
-          email: user.email,
-          createdAt: realCreationDate,
-          lastLogin: serverTimestamp(),
-          id: user.uid,
-          isAdmin: isAdmin, // Usamos la lógica de bypass aquí también para guardarlo
-          status: userData?.status || 'active',
-          recommendationCount: userData?.recommendationCount || 0,
-          isRestricted: userData?.isRestricted || false
-        }, { merge: true });
-      } else {
-        updateDocumentNonBlocking(userRef, { 
-          lastLogin: serverTimestamp(),
-          email: user.email,
-          createdAt: userData.createdAt || realCreationDate
-        });
-      }
+      // Forzamos la creación/actualización con set merge para asegurar campos de ordenación
+      setDocumentNonBlocking(userRef, {
+        email: user.email,
+        id: user.uid,
+        lastLogin: serverTimestamp(),
+        // Solo inicializamos estos si no existen para no sobreescribir
+        createdAt: userData?.createdAt || realCreationDate,
+        isAdmin: isAdmin, // El bypass también se guarda si entra el admin
+        status: userData?.status || 'active',
+        recommendationCount: userData?.recommendationCount || 0,
+        isRestricted: userData?.isRestricted || false
+      }, { merge: true });
     }
-  }, [user, db, userData, isUserDataLoading, isUserLoading, isAdmin]);
+  }, [user, db, isAdmin, userData?.createdAt, userData?.status, userData?.recommendationCount, userData?.isRestricted]);
 
   // Consultas de películas
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -124,12 +111,19 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración
+  // Panel de administración (Ordenado por el campo que ahora aseguramos)
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
   }, [db, isAdmin]);
   const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
+
+  // Estadísticas globales para el admin
+  const statsDocRef = useMemoFirebase(() => {
+    if (!db || !isAdmin) return null;
+    return doc(db, 'globalStats', todayStr);
+  }, [db, isAdmin, todayStr]);
+  const { data: globalTodayStats } = useDoc(statsDocRef);
 
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -168,11 +162,13 @@ export default function Home() {
       setRecommendations(results);
       
       if (db && user) {
+        // Actualización de estadísticas globales
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
         
+        // Actualización de contador de usuario (Usamos set merge para evitar errores de persistencia)
         const userRef = doc(db, 'users', user.uid);
-        updateDocumentNonBlocking(userRef, { recommendationCount: increment(1) });
+        setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
       }
       
       setActiveTab('explore');
@@ -216,7 +212,7 @@ export default function Home() {
     return lastLoginDate > fiveMinutesAgo;
   };
 
-  if (isUserLoading || (user && isUserDataLoading)) {
+  if (isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
