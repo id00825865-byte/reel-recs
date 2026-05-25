@@ -32,8 +32,7 @@ import {
   Zap,
   ZapOff,
   AlertTriangle,
-  CalendarDays,
-  Circle
+  CalendarDays
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -109,22 +108,31 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración (Sin orderBy para asegurar que salgan todos los usuarios)
+  // Panel de administración
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios en el cliente para evitar que los que no tienen lastLogin desaparezcan
+  // Ordenamos los usuarios en el cliente, poniendo al usuario actual primero
   const allUsers = useMemo(() => {
-    if (!rawUsers) return [];
-    return [...rawUsers].sort((a, b) => {
+    if (!rawUsers || !user) return [];
+    
+    // Separamos el usuario actual del resto
+    const currentUserProfile = rawUsers.find(u => u.id === user.uid);
+    const otherUsers = rawUsers.filter(u => u.id !== user.uid);
+
+    // Ordenamos los demás por última conexión
+    const sortedOthers = [...otherUsers].sort((a, b) => {
       const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : new Date(a.lastLogin || 0).getTime();
       const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : new Date(b.lastLogin || 0).getTime();
       return dateB - dateA;
     });
-  }, [rawUsers]);
+
+    // Devolvemos el usuario actual primero si existe en la lista, seguido de los demás
+    return currentUserProfile ? [currentUserProfile, ...sortedOthers] : sortedOthers;
+  }, [rawUsers, user]);
 
   // Estadísticas globales para el admin
   const statsDocRef = useMemoFirebase(() => {
@@ -534,11 +542,12 @@ export default function Home() {
                             </tr>
                           ) : allUsers && allUsers.length > 0 ? (
                             allUsers.map((u) => (
-                              <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
+                              <tr key={u.id} className={`hover:bg-secondary/20 transition-colors ${u.id === user.uid ? 'bg-primary/5' : ''}`}>
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col">
                                     <div className="flex items-center gap-2">
                                       <span className="font-bold">{u.email || 'Sin email'}</span>
+                                      {u.id === user.uid && <span className="text-[8px] bg-primary/20 text-primary px-1 py-0.5 rounded font-black uppercase">Tú</span>}
                                       {isOnline(u.lastLogin) && (
                                         <div className="flex items-center gap-1 bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
                                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
