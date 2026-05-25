@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { recommendMovies, type RecommendMoviesOutput } from '@/ai/flows/recommend-movies-flow';
 import { MovieCard } from '@/components/movie-card';
 import { AuthForm } from '@/components/auth-form';
@@ -9,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, ShieldCheck, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
-import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
+import { collection, query, orderBy, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
 const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
@@ -31,6 +33,25 @@ export default function Home() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
+
+  // Documento del perfil del usuario actual
+  const userDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user]);
+  const { data: userData } = useDoc(userDocRef);
+
+  // Asegurar que el perfil del usuario existe en Firestore
+  useEffect(() => {
+    if (user && db && !userData && !isUserLoading) {
+      setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        createdAt: serverTimestamp(),
+        id: user.uid,
+        isAdmin: false // Por defecto no es admin
+      }, { merge: true });
+    }
+  }, [user, db, userData, isUserLoading]);
 
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -55,6 +76,13 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
   const watchlistIds = useMemo(() => watchlistMovies?.map(m => getStableId(m.title)) || [], [watchlistMovies]);
+
+  // Consulta para el panel de administración (solo se activa si es admin)
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!db || !userData?.isAdmin) return null;
+    return query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+  }, [db, userData]);
+  const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,8 +148,13 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
-            <UserIcon className="w-4 h-4 text-primary" />
+            {userData?.isAdmin ? (
+              <ShieldCheck className="w-4 h-4 text-accent animate-pulse" />
+            ) : (
+              <UserIcon className="w-4 h-4 text-primary" />
+            )}
             <span className="text-sm font-medium">{user.email}</span>
+            {userData?.isAdmin && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">ADMIN</span>}
           </div>
           <Button variant="ghost" size="icon" onClick={handleSignOut}>
             <LogOut className="w-5 h-5" />
@@ -214,6 +247,11 @@ export default function Home() {
               <TabsTrigger value="explore" className="px-6 data-[state=active]:bg-primary">Recomendaciones</TabsTrigger>
               <TabsTrigger value="watchlist" className="px-6 data-[state=active]:bg-primary">Por ver</TabsTrigger>
               <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary">Historial</TabsTrigger>
+              {userData?.isAdmin && (
+                <TabsTrigger value="admin" className="px-6 data-[state=active]:bg-accent text-accent data-[state=active]:text-white">
+                  <ShieldCheck className="w-4 h-4 mr-2" /> Panel Admin
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -307,6 +345,73 @@ export default function Home() {
               </div>
             )}
           </TabsContent>
+
+          {userData?.isAdmin && (
+            <TabsContent value="admin">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="bg-card/50 border-border/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Users className="w-4 h-4 text-primary" /> Total Usuarios
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <span className="text-4xl font-black">{allUsers?.length || 0}</span>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="bg-card/50 border-border/30">
+                  <CardHeader>
+                    <CardTitle className="font-headline text-2xl font-bold">Registro de Usuarios (Logins)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative overflow-x-auto rounded-xl border border-border/30">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
+                          <tr>
+                            <th className="px-6 py-4">ID de Usuario</th>
+                            <th className="px-6 py-4">Email</th>
+                            <th className="px-6 py-4">Rol</th>
+                            <th className="px-6 py-4">Fecha de Registro</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/20">
+                          {isLoadingAdmin ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td>
+                            </tr>
+                          ) : allUsers && allUsers.length > 0 ? (
+                            allUsers.map((u) => (
+                              <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
+                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{u.id}</td>
+                                <td className="px-6 py-4 font-bold">{u.email}</td>
+                                <td className="px-6 py-4">
+                                  {u.isAdmin ? (
+                                    <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold">Administrador</span>
+                                  ) : (
+                                    <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold">Usuario</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-muted-foreground">
+                                  {u.createdAt ? new Date(u.createdAt.seconds * 1000).toLocaleString() : 'Reciente'}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </section>
     </main>

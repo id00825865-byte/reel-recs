@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -11,10 +12,22 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Regla recursiva para el usuario y todas sus subcolecciones
-    // Esto cubre /users/{userId}, /users/{userId}/watchedMovies y /users/{userId}/watchlist
+    // Función para verificar si el usuario es administrador
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Regla para el usuario y todas sus subcolecciones
     match /users/{userId}/{allPaths=**} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+    }
+
+    // Permitir a administradores listar la colección de usuarios
+    match /users/{userId} {
+      allow list: if isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
     }
 
     // Regla para la colección global de películas (si existiera)
