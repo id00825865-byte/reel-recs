@@ -29,7 +29,10 @@ import {
   UserMinus,
   Ban,
   MessageSquareShare,
-  Activity
+  Activity,
+  Zap,
+  ZapOff,
+  AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -77,15 +80,16 @@ export default function Home() {
       const userRef = doc(db, 'users', user.uid);
       const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
       
-      // Si el documento no existe, o si existe pero la fecha de creación parece incorrecta (ej: se guardó mal antes)
-      if (!userData || !userData.createdAt || (userData.createdAt.startsWith(todayStr) && new Date(user.metadata.creationTime).getDate() !== new Date().getDate())) {
+      if (!userData || !userData.createdAt) {
         setDocumentNonBlocking(userRef, {
           email: user.email,
           createdAt: creationTime.toISOString(),
           lastLogin: serverTimestamp(),
           id: user.uid,
           isAdmin: userData?.isAdmin || false,
-          status: userData?.status || 'active'
+          status: userData?.status || 'active',
+          recommendationCount: userData?.recommendationCount || 0,
+          isRestricted: userData?.isRestricted || false
         }, { merge: true });
       } else {
         setDocumentNonBlocking(userRef, { 
@@ -94,7 +98,7 @@ export default function Home() {
         }, { merge: true });
       }
     }
-  }, [user, db, userData, isUserDataLoading, isUserLoading, todayStr]);
+  }, [user, db, userData, isUserDataLoading, isUserLoading]);
 
   // Consultas de películas para el usuario logueado
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -130,6 +134,16 @@ export default function Home() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!preferences.trim()) return;
+
+    if (userData?.isRestricted) {
+      toast({ 
+        title: "Acceso restringido", 
+        description: "Un administrador ha pausado tu acceso a la IA para hoy. Inténtalo más tarde.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setLoading(true);
     setRecommendations(null);
     try {
@@ -142,10 +156,15 @@ export default function Home() {
       });
       setRecommendations(results);
       
-      // Registrar la consulta en las estadísticas globales
-      if (db) {
+      // Registrar la consulta
+      if (db && user) {
+        // Global
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
+        
+        // Individual
+        const userRef = doc(db, 'users', user.uid);
+        setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
       }
       
       setActiveTab('explore');
@@ -161,6 +180,16 @@ export default function Home() {
     const ref = doc(db, 'users', targetUserId);
     setDocumentNonBlocking(ref, { isAdmin: !currentStatus }, { merge: true });
     toast({ title: "Rol actualizado", description: `Usuario ${!currentStatus ? 'promocionado' : 'degradado'}` });
+  };
+
+  const handleToggleRestriction = (targetUserId: string, currentRestricted: boolean) => {
+    if (!db) return;
+    const ref = doc(db, 'users', targetUserId);
+    setDocumentNonBlocking(ref, { isRestricted: !currentRestricted }, { merge: true });
+    toast({ 
+      title: !currentRestricted ? "Usuario restringido" : "Restricción eliminada", 
+      description: !currentRestricted ? "El usuario ya no puede usar la IA hoy." : "El usuario puede volver a usar la IA."
+    });
   };
 
   const handleDeleteUser = async (targetUserId: string) => {
@@ -230,6 +259,12 @@ export default function Home() {
       </nav>
 
       <header className="w-full max-w-7xl px-6 pt-12 pb-8 flex flex-col items-center text-center">
+        {userData?.isRestricted && (
+          <div className="w-full max-w-2xl mb-6 bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl flex items-center gap-3 animate-pulse">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-bold">Tu acceso a las recomendaciones de IA ha sido limitado temporalmente por un administrador.</span>
+          </div>
+        )}
         <h1 className="font-headline text-4xl md:text-6xl font-black mb-4 tracking-tight">
           ¿Qué <span className="text-primary italic">cine</span> te apetece?
         </h1>
@@ -247,7 +282,7 @@ export default function Home() {
                 type="submit" 
                 size="lg" 
                 className="h-14 md:px-8 bg-primary rounded-xl gap-2 font-bold"
-                disabled={loading || !preferences.trim()}
+                disabled={loading || !preferences.trim() || userData?.isRestricted}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Buscar</>}
               </Button>
@@ -462,8 +497,8 @@ export default function Home() {
                         <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
                           <tr>
                             <th className="px-6 py-4">Usuario / ID</th>
+                            <th className="px-6 py-4">Consultas</th>
                             <th className="px-6 py-4">Rol / Estado</th>
-                            <th className="px-6 py-4">Fecha Registro</th>
                             <th className="px-6 py-4">Última Conexión</th>
                             <th className="px-6 py-4">Acciones</th>
                           </tr>
@@ -483,25 +518,27 @@ export default function Home() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3 text-primary" />
+                                    <span className="font-black text-lg">{u.recommendationCount || 0}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
                                   <div className="flex flex-col gap-1">
                                     {u.isAdmin ? (
                                       <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Administrador</span>
                                     ) : (
                                       <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Usuario</span>
                                     )}
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold w-fit ${u.status === 'banned' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
-                                      {u.status === 'banned' ? 'Suspendido' : 'Activo'}
-                                    </span>
+                                    <div className="flex gap-1">
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold w-fit ${u.status === 'banned' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
+                                        {u.status === 'banned' ? 'Suspendido' : 'Activo'}
+                                      </span>
+                                      {u.isRestricted && (
+                                        <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">IA Pausada</span>
+                                      )}
+                                    </div>
                                   </div>
-                                </td>
-                                <td className="px-6 py-4 text-muted-foreground text-xs">
-                                  {u.createdAt ? (
-                                    typeof u.createdAt === 'string' 
-                                      ? new Date(u.createdAt).toLocaleDateString() 
-                                      : u.createdAt.seconds 
-                                        ? new Date(u.createdAt.seconds * 1000).toLocaleDateString()
-                                        : new Date(u.createdAt).toLocaleDateString()
-                                  ) : 'Histórico'}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -511,6 +548,16 @@ export default function Home() {
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className={`h-8 w-8 ${u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500'}`}
+                                      onClick={() => handleToggleRestriction(u.id, !!u.isRestricted)}
+                                      title={u.isRestricted ? "Habilitar IA" : "Restringir IA Hoy"}
+                                      disabled={u.id === user.uid}
+                                    >
+                                      {u.isRestricted ? <ZapOff className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                                    </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
