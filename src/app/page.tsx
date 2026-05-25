@@ -29,7 +29,8 @@ import {
   UserMinus,
   Ban,
   CheckCircle,
-  Clapperboard
+  Clapperboard,
+  Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -67,24 +68,24 @@ export default function Home() {
     if (user && db && !isUserDataLoading && !isUserLoading) {
       const userRef = doc(db, 'users', user.uid);
       
-      // Intentamos capturar la fecha de creación real de Firebase Auth si es posible
-      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : null;
+      // Obtenemos la fecha de creación REAL de Firebase Auth
+      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
       
       if (!userData) {
+        // Si no existe el documento, lo creamos con la fecha de creación real del Auth
         setDocumentNonBlocking(userRef, {
           email: user.email,
-          createdAt: creationTime || serverTimestamp(),
+          createdAt: creationTime.toISOString(),
           lastLogin: serverTimestamp(),
           id: user.uid,
           isAdmin: false,
           status: 'active'
         }, { merge: true });
       } else {
+        // Si existe, SOLO actualizamos el último login, nunca la fecha de creación
         setDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
           email: user.email,
-          // Solo actualizamos createdAt si no existía ya en Firestore
-          ...(userData.createdAt ? {} : { createdAt: creationTime || serverTimestamp() })
         }, { merge: true });
       }
     }
@@ -419,12 +420,12 @@ export default function Home() {
                   <Card className="bg-card/50 border-border/30">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" /> Películas Vistas
+                        <Activity className="w-4 h-4 text-green-500" /> Actividad Global
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-4xl font-black">Comunidad</span>
-                      <p className="text-xs text-muted-foreground mt-1">Actividad global registrada</p>
+                      <span className="text-4xl font-black">Activo</span>
+                      <p className="text-xs text-muted-foreground mt-1">Sincronización en tiempo real</p>
                     </CardContent>
                   </Card>
 
@@ -451,7 +452,7 @@ export default function Home() {
                           <tr>
                             <th className="px-6 py-4">Usuario / ID</th>
                             <th className="px-6 py-4">Rol / Estado</th>
-                            <th className="px-6 py-4">Registro (Auth)</th>
+                            <th className="px-6 py-4">Fecha Registro</th>
                             <th className="px-6 py-4">Última Conexión</th>
                             <th className="px-6 py-4">Acciones</th>
                           </tr>
@@ -484,10 +485,12 @@ export default function Home() {
                                 </td>
                                 <td className="px-6 py-4 text-muted-foreground text-xs">
                                   {u.createdAt ? (
-                                    u.createdAt.seconds 
-                                      ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() 
-                                      : new Date(u.createdAt).toLocaleDateString()
-                                  ) : 'N/A'}
+                                    typeof u.createdAt === 'string' 
+                                      ? new Date(u.createdAt).toLocaleDateString() 
+                                      : u.createdAt.seconds 
+                                        ? new Date(u.createdAt.seconds * 1000).toLocaleDateString()
+                                        : new Date(u.createdAt).toLocaleDateString()
+                                  ) : 'Histórico'}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
