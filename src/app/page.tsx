@@ -38,7 +38,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp, getDoc, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { cn } from '@/lib/utils';
@@ -61,7 +61,7 @@ export default function Home() {
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  // Documento del perfil del usuario actual - Vinculado estrictamente al UID
+  // Documento del perfil del usuario actual
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, 'users', user.uid);
@@ -69,54 +69,44 @@ export default function Home() {
   
   const { data: userData } = useDoc(userDocRef);
 
-  // Lógica de administrador definitiva: Base de datos O bypass por correo
+  // Lógica de administrador: Documento en DB O bypass por correo maestro
   const isAdmin = useMemo(() => {
     if (!user) return false;
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData?.isAdmin, user?.email]);
 
-  // Sincronización del perfil del usuario (Reforzada para evitar sobrescrituras accidentales)
+  // Sincronización del perfil del usuario (Garantiza creación del documento sin sobreescribir permisos)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
-      const isBypassEmail = user.email === 'id00825865@usal.es';
       
       const syncProfile = async () => {
         try {
           const snap = await getDoc(userRef);
           
-          const updateData: any = {
-            email: user.email,
-            id: user.uid,
-            lastLogin: serverTimestamp(),
-          };
-
-          if (isBypassEmail) {
-            updateData.isAdmin = true;
-          }
-
           if (!snap.exists()) {
-            // Documento nuevo
+            // Documento totalmente nuevo: Inicializamos con todo
             const initialData = {
-              ...updateData,
+              id: user.uid,
+              email: user.email,
               createdAt: new Date().toISOString(),
-              isAdmin: isBypassEmail,
+              lastLogin: serverTimestamp(),
+              isAdmin: user.email === 'id00825865@usal.es', // Auto-admin para el maestro
               status: 'active',
               recommendationCount: 0,
               isRestricted: false,
             };
-            setDocumentNonBlocking(userRef, initialData, { merge: true });
+            await setDoc(userRef, initialData);
           } else {
-            // Documento existente: SOLO actualizamos lo básico para no borrar isAdmin o isRestricted
-            setDocumentNonBlocking(userRef, updateData, { merge: true });
+            // Usuario ya existe: SOLO actualizamos login y email. 
+            // NUNCA tocamos isAdmin, isRestricted o status aquí para no resetear los cambios del panel.
+            await setDoc(userRef, {
+              email: user.email,
+              lastLogin: serverTimestamp(),
+            }, { merge: true });
           }
         } catch (e) {
-          // En caso de error de cuota en el read, intentamos al menos el set merge
-          setDocumentNonBlocking(userRef, {
-            email: user.email,
-            id: user.uid,
-            lastLogin: serverTimestamp(),
-          }, { merge: true });
+          console.error("Error syncing profile:", e);
         }
       };
 
@@ -137,18 +127,17 @@ export default function Home() {
   }, [db, user?.uid]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración - Consulta de TODOS los usuarios sin filtros
+  // Panel de administración - Consulta limpia de todos los usuarios
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios en el cliente para asegurar que todos aparezcan
+  // Ordenamos los usuarios en el cliente: Tú primero, luego por login
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
     
-    // Filtramos y ordenamos: Tú primero, luego el resto por fecha de login descendente
     const currentUserProfile = rawUsers.find(u => u.id === user.uid);
     const otherUsers = rawUsers
       .filter(u => u.id !== user.uid)
@@ -230,8 +219,8 @@ export default function Home() {
     const ref = doc(db, 'users', targetUserId);
     updateDocumentNonBlocking(ref, { isRestricted: !currentRestricted });
     toast({ 
-      title: !currentRestricted ? "Usuario restringido" : "Acceso restaurado", 
-      description: !currentRestricted ? "El usuario no podrá usar la IA." : "Acceso restaurado."
+      title: !currentRestricted ? "IA Pausada" : "Acceso restaurado", 
+      description: !currentRestricted ? "El usuario ya no puede usar la IA." : "El usuario puede volver a usar la IA."
     });
   };
 
@@ -259,7 +248,6 @@ export default function Home() {
     } else {
       lastLoginDate = new Date(lastLogin);
     }
-    if (isNaN(lastLoginDate.getTime())) return false;
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     return lastLoginDate > fiveMinutesAgo;
   };
@@ -308,7 +296,7 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
             {isAdmin ? (
-              <ShieldCheck className="w-4 h-4 text-accent animate-pulse" />
+              <ShieldCheck className="w-4 h-4 text-accent" />
             ) : (
               <UserIcon className="w-4 h-4 text-primary" />
             )}
@@ -325,7 +313,7 @@ export default function Home() {
         {userData?.isRestricted && (
           <div className="w-full max-w-2xl mb-6 bg-orange-500/10 border border-orange-500/20 text-orange-500 p-4 rounded-xl flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-bold">Tu acceso a las recomendaciones de IA ha sido limitado temporalmente por un administrador.</span>
+            <span className="text-sm font-bold">Tu acceso a la IA ha sido pausado. No puedes realizar búsquedas.</span>
           </div>
         )}
         <h1 className="font-headline text-4xl md:text-6xl font-black mb-4 tracking-tight">
@@ -558,10 +546,10 @@ export default function Home() {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
                           <tr>
-                            <th className="px-6 py-4">Usuario / ID</th>
+                            <th className="px-6 py-4">Usuario</th>
                             <th className="px-6 py-4">Consultas</th>
                             <th className="px-6 py-4">Estado / Rol</th>
-                            <th className="px-6 py-4">Registro y Conexión</th>
+                            <th className="px-6 py-4">Última Conexión</th>
                             <th className="px-6 py-4">Acciones</th>
                           </tr>
                         </thead>
@@ -572,7 +560,7 @@ export default function Home() {
                             </tr>
                           ) : allUsers && allUsers.length > 0 ? (
                             allUsers.map((u) => (
-                              <tr key={u.id} className={`hover:bg-secondary/20 transition-colors ${u.id === user.uid ? 'bg-primary/5' : ''}`}>
+                              <tr key={u.id} className={cn("hover:bg-secondary/20 transition-colors", u.id === user.uid && "bg-primary/5")}>
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col">
                                     <div className="flex items-center gap-2">
@@ -626,15 +614,9 @@ export default function Home() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="flex flex-col gap-1 text-[10px] text-muted-foreground font-medium">
-                                    <div className="flex items-center gap-1.5">
-                                      <CalendarDays className="w-3 h-3 text-primary" />
-                                      <span>Unido: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Desconocido'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <Clock className="w-3 h-3 text-accent" />
-                                      <span>Visto: {u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
-                                    </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                                    <Clock className="w-3 h-3 text-primary" />
+                                    <span>{u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Nunca'}</span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -642,7 +624,7 @@ export default function Home() {
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className={`h-8 w-8 transition-colors ${u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500'}`}
+                                      className={cn("h-8 w-8 transition-colors", u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500')}
                                       onClick={() => handleToggleRestriction(u.id, !!u.isRestricted)}
                                       title={u.isRestricted ? "Habilitar IA" : "Pausar IA"}
                                       disabled={u.id === user.uid}
