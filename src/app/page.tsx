@@ -539,15 +539,10 @@ export default function Home() {
                                   <div className="flex flex-col">
                                     <div className="flex items-center gap-2">
                                       <span className="font-bold">{u.email || 'Sin email'}</span>
-                                      {isOnline(u.lastLogin) ? (
+                                      {isOnline(u.lastLogin) && (
                                         <div className="flex items-center gap-1 bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
                                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                                           En línea
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-1 bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
-                                          <Circle className="w-1.5 h-1.5 fill-muted-foreground" />
-                                          Off
                                         </div>
                                       )}
                                     </div>
