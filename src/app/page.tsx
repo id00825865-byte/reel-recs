@@ -11,12 +11,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, ShieldCheck, Users, Clock } from 'lucide-react';
+import { 
+  Film, 
+  Search, 
+  Loader2, 
+  Sparkles, 
+  LogOut, 
+  User as UserIcon, 
+  History, 
+  Bookmark, 
+  Sparkle, 
+  ShieldCheck, 
+  Users, 
+  Clock, 
+  Trash2, 
+  UserPlus, 
+  UserMinus,
+  Ban,
+  CheckCircle,
+  Clapperboard
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
 
@@ -45,33 +65,52 @@ export default function Home() {
   // Efecto para asegurar que el perfil del usuario existe y registrar su conexión
   useEffect(() => {
     if (user && db && !isUserDataLoading && !isUserLoading) {
-      // Si el documento no existe, lo creamos. Si existe, actualizamos la última conexión.
       const userRef = doc(db, 'users', user.uid);
       
+      // Intentamos capturar la fecha de creación real de Firebase Auth si es posible
+      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : null;
+      
       if (!userData) {
-        setDoc(userRef, {
+        setDocumentNonBlocking(userRef, {
           email: user.email,
-          createdAt: serverTimestamp(),
+          createdAt: creationTime || serverTimestamp(),
           lastLogin: serverTimestamp(),
           id: user.uid,
-          isAdmin: false
+          isAdmin: false,
+          status: 'active'
         }, { merge: true });
       } else {
-        // Actualizamos solo el último login si ya existe el perfil
-        setDoc(userRef, { 
+        setDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
-          email: user.email // Aseguramos que el email esté presente
+          email: user.email,
+          // Solo actualizamos createdAt si no existía ya en Firestore
+          ...(userData.createdAt ? {} : { createdAt: creationTime || serverTimestamp() })
         }, { merge: true });
       }
     }
   }, [user, db, !!userData, isUserDataLoading, isUserLoading]);
 
+  // Consultas de películas para el usuario logueado
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
   }, [db, user]);
   const { data: watchedMovies } = useCollection(watchedMoviesQuery);
   
+  const watchlistQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
+  }, [db, user]);
+  const { data: watchlistMovies } = useCollection(watchlistQuery);
+
+  // Consulta para el panel de administración
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!db || !userData?.isAdmin) return null;
+    return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
+  }, [db, userData?.isAdmin]);
+  const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
+
+  // Mapeos de IDs para UI
   const watchedRatingsMap = useMemo(() => {
     const map: Record<string, number> = {};
     watchedMovies?.forEach(m => {
@@ -80,31 +119,14 @@ export default function Home() {
     });
     return map;
   }, [watchedMovies]);
-
   const watchedIds = useMemo(() => Object.keys(watchedRatingsMap), [watchedRatingsMap]);
-
-  const watchlistQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, 'users', user.uid, 'watchlist'), orderBy('addedAt', 'desc'));
-  }, [db, user]);
-  const { data: watchlistMovies } = useCollection(watchlistQuery);
   const watchlistIds = useMemo(() => watchlistMovies?.map(m => getStableId(m.title)) || [], [watchlistMovies]);
-
-  // Consulta para el panel de administración: listamos a todos los usuarios
-  const allUsersQuery = useMemoFirebase(() => {
-    if (!db || !userData?.isAdmin) return null;
-    // Quitamos el orderBy temporalmente para asegurar que vemos a todos aunque no tengan createdAt
-    return collection(db, 'users');
-  }, [db, userData?.isAdmin]);
-  const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!preferences.trim()) return;
-
     setLoading(true);
     setRecommendations(null);
-
     try {
       const results = await recommendMovies({ 
         preferences,
@@ -116,19 +138,27 @@ export default function Home() {
       setRecommendations(results);
       setActiveTab('explore');
     } catch (error: any) {
-      toast({
-        title: "Error en la búsqueda",
-        description: error.message || "No pudimos obtener recomendaciones.",
-        variant: "destructive",
-      });
+      toast({ title: "Error en la búsqueda", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignOut = () => {
-    signOut(auth);
+  const handleToggleAdmin = (targetUserId: string, currentStatus: boolean) => {
+    if (!db) return;
+    const ref = doc(db, 'users', targetUserId);
+    setDocumentNonBlocking(ref, { isAdmin: !currentStatus }, { merge: true });
+    toast({ title: "Rol actualizado", description: `Usuario ${!currentStatus ? 'promocionado' : 'degradado'}` });
   };
+
+  const handleDeleteUser = async (targetUserId: string) => {
+    if (!db || !confirm('¿Estás seguro de eliminar este perfil? Se borrarán sus datos de ReelRecs.')) return;
+    const ref = doc(db, 'users', targetUserId);
+    deleteDocumentNonBlocking(ref);
+    toast({ title: "Usuario eliminado", description: "El perfil ha sido borrado del sistema." });
+  };
+
+  const handleSignOut = () => signOut(auth);
 
   if (isUserLoading || (user && isUserDataLoading)) {
     return (
@@ -138,7 +168,7 @@ export default function Home() {
     );
   }
 
-  if (!user) {
+  if (!user || userData?.status === 'banned') {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
         <Toaster />
@@ -146,7 +176,18 @@ export default function Home() {
           <Film className="w-12 h-12 text-primary" />
           <h1 className="font-headline text-5xl font-black">ReelRecs</h1>
         </div>
-        <AuthForm />
+        {userData?.status === 'banned' ? (
+          <Card className="max-w-md bg-destructive/10 border-destructive">
+            <CardHeader className="text-center">
+              <Ban className="w-12 h-12 text-destructive mx-auto mb-4" />
+              <CardTitle>Cuenta Suspendida</CardTitle>
+              <p className="text-muted-foreground mt-2">Tu acceso a ReelRecs ha sido restringido por un administrador.</p>
+              <Button variant="outline" className="mt-4" onClick={handleSignOut}>Cerrar Sesión</Button>
+            </CardHeader>
+          </Card>
+        ) : (
+          <AuthForm />
+        )}
       </main>
     );
   }
@@ -374,27 +415,51 @@ export default function Home() {
                       <span className="text-4xl font-black">{allUsers?.length || 0}</span>
                     </CardContent>
                   </Card>
+                  
+                  <Card className="bg-card/50 border-border/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-500" /> Películas Vistas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <span className="text-4xl font-black">Comunidad</span>
+                      <p className="text-xs text-muted-foreground mt-1">Actividad global registrada</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card/50 border-border/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-accent" /> Staff
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <span className="text-4xl font-black">{allUsers?.filter(u => u.isAdmin).length || 0}</span>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 <Card className="bg-card/50 border-border/30">
                   <CardHeader>
-                    <CardTitle className="font-headline text-2xl font-bold">Gestión de Usuarios Registrados</CardTitle>
+                    <CardTitle className="font-headline text-2xl font-bold">Gestión de Usuarios y Seguridad</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="relative overflow-x-auto rounded-xl border border-border/30">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
                           <tr>
-                            <th className="px-6 py-4">Usuario</th>
-                            <th className="px-6 py-4">Rol</th>
-                            <th className="px-6 py-4">Registro</th>
+                            <th className="px-6 py-4">Usuario / ID</th>
+                            <th className="px-6 py-4">Rol / Estado</th>
+                            <th className="px-6 py-4">Registro (Auth)</th>
                             <th className="px-6 py-4">Última Conexión</th>
+                            <th className="px-6 py-4">Acciones</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/20">
                           {isLoadingAdmin ? (
                             <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td>
+                              <td colSpan={5} className="px-6 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td>
                             </tr>
                           ) : allUsers && allUsers.length > 0 ? (
                             allUsers.map((u) => (
@@ -406,14 +471,23 @@ export default function Home() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  {u.isAdmin ? (
-                                    <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold">Administrador</span>
-                                  ) : (
-                                    <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold">Usuario</span>
-                                  )}
+                                  <div className="flex flex-col gap-1">
+                                    {u.isAdmin ? (
+                                      <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Administrador</span>
+                                    ) : (
+                                      <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Usuario</span>
+                                    )}
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold w-fit ${u.status === 'banned' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
+                                      {u.status === 'banned' ? 'Suspendido' : 'Activo'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 text-muted-foreground text-xs">
-                                  {u.createdAt ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                                  {u.createdAt ? (
+                                    u.createdAt.seconds 
+                                      ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() 
+                                      : new Date(u.createdAt).toLocaleDateString()
+                                  ) : 'N/A'}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -421,11 +495,35 @@ export default function Home() {
                                     {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendiente'}
                                   </div>
                                 </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-muted-foreground hover:text-accent"
+                                      onClick={() => handleToggleAdmin(u.id, !!u.isAdmin)}
+                                      title={u.isAdmin ? "Degradar a Usuario" : "Promocionar a Admin"}
+                                      disabled={u.id === user.uid}
+                                    >
+                                      {u.isAdmin ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                      onClick={() => handleDeleteUser(u.id)}
+                                      title="Eliminar Perfil"
+                                      disabled={u.id === user.uid}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados en el sistema</td>
+                              <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados en el sistema</td>
                             </tr>
                           )}
                         </tbody>
