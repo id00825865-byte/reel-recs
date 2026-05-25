@@ -29,17 +29,17 @@ import {
   UserMinus,
   Ban,
   MessageSquareShare,
-  Activity,
   Zap,
   ZapOff,
-  AlertTriangle
+  AlertTriangle,
+  CalendarDays
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, setDoc, deleteDoc, getDocs, increment } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, increment } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { deleteDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const getStableId = (title: string) => title.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
 
@@ -74,16 +74,21 @@ export default function Home() {
   }, [db, userData?.isAdmin, todayStr]);
   const { data: globalTodayStats } = useDoc(statsDocRef);
 
-  // Efecto para asegurar que el perfil del usuario existe y registrar su conexión
+  // Sincronización del perfil del usuario
   useEffect(() => {
     if (user && db && !isUserDataLoading && !isUserLoading) {
       const userRef = doc(db, 'users', user.uid);
-      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
       
+      // Obtenemos la fecha de creación real desde los metadatos de Auth
+      const realCreationDate = user.metadata.creationTime 
+        ? new Date(user.metadata.creationTime).toISOString() 
+        : new Date().toISOString();
+
       if (!userData || !userData.createdAt) {
+        // Si no tiene perfil o no tiene fecha, lo creamos con la fecha real de Auth
         setDocumentNonBlocking(userRef, {
           email: user.email,
-          createdAt: creationTime.toISOString(),
+          createdAt: realCreationDate,
           lastLogin: serverTimestamp(),
           id: user.uid,
           isAdmin: userData?.isAdmin || false,
@@ -92,15 +97,16 @@ export default function Home() {
           isRestricted: userData?.isRestricted || false
         }, { merge: true });
       } else {
-        setDocumentNonBlocking(userRef, { 
+        // Si ya existe, solo actualizamos el último login
+        updateDocumentNonBlocking(userRef, { 
           lastLogin: serverTimestamp(),
           email: user.email,
-        }, { merge: true });
+        });
       }
     }
   }, [user, db, userData, isUserDataLoading, isUserLoading]);
 
-  // Consultas de películas para el usuario logueado
+  // Consultas de películas
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'users', user.uid, 'watchedMovies'), orderBy('watchedAt', 'desc'));
@@ -113,7 +119,7 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Consulta para el panel de administración
+  // Panel de administración
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !userData?.isAdmin) return null;
     return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
@@ -137,8 +143,8 @@ export default function Home() {
 
     if (userData?.isRestricted) {
       toast({ 
-        title: "Acceso restringido", 
-        description: "Un administrador ha pausado tu acceso a la IA para hoy. Inténtalo más tarde.", 
+        title: "Acceso denegado", 
+        description: "Tu acceso a la IA ha sido pausado por un administrador.", 
         variant: "destructive" 
       });
       return;
@@ -156,15 +162,12 @@ export default function Home() {
       });
       setRecommendations(results);
       
-      // Registrar la consulta
       if (db && user) {
-        // Global
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
         
-        // Individual
         const userRef = doc(db, 'users', user.uid);
-        setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
+        updateDocumentNonBlocking(userRef, { recommendationCount: increment(1) });
       }
       
       setActiveTab('explore');
@@ -178,25 +181,25 @@ export default function Home() {
   const handleToggleAdmin = (targetUserId: string, currentStatus: boolean) => {
     if (!db) return;
     const ref = doc(db, 'users', targetUserId);
-    setDocumentNonBlocking(ref, { isAdmin: !currentStatus }, { merge: true });
+    updateDocumentNonBlocking(ref, { isAdmin: !currentStatus });
     toast({ title: "Rol actualizado", description: `Usuario ${!currentStatus ? 'promocionado' : 'degradado'}` });
   };
 
   const handleToggleRestriction = (targetUserId: string, currentRestricted: boolean) => {
     if (!db) return;
     const ref = doc(db, 'users', targetUserId);
-    setDocumentNonBlocking(ref, { isRestricted: !currentRestricted }, { merge: true });
+    updateDocumentNonBlocking(ref, { isRestricted: !currentRestricted });
     toast({ 
-      title: !currentRestricted ? "Usuario restringido" : "Restricción eliminada", 
-      description: !currentRestricted ? "El usuario ya no puede usar la IA hoy." : "El usuario puede volver a usar la IA."
+      title: !currentRestricted ? "Usuario restringido" : "Acceso restaurado", 
+      description: !currentRestricted ? "El usuario no podrá usar la IA hasta que lo habilites." : "El usuario puede volver a usar la IA."
     });
   };
 
   const handleDeleteUser = async (targetUserId: string) => {
-    if (!db || !confirm('¿Estás seguro de eliminar este perfil? Se borrarán sus datos de ReelRecs.')) return;
+    if (!db || !confirm('¿Estás seguro de eliminar este perfil?')) return;
     const ref = doc(db, 'users', targetUserId);
     deleteDocumentNonBlocking(ref);
-    toast({ title: "Usuario eliminado", description: "El perfil ha sido borrado del sistema." });
+    toast({ title: "Usuario eliminado", description: "El perfil ha sido borrado." });
   };
 
   const handleSignOut = () => signOut(auth);
@@ -260,7 +263,7 @@ export default function Home() {
 
       <header className="w-full max-w-7xl px-6 pt-12 pb-8 flex flex-col items-center text-center">
         {userData?.isRestricted && (
-          <div className="w-full max-w-2xl mb-6 bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl flex items-center gap-3 animate-pulse">
+          <div className="w-full max-w-2xl mb-6 bg-orange-500/10 border border-orange-500/20 text-orange-500 p-4 rounded-xl flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0" />
             <span className="text-sm font-bold">Tu acceso a las recomendaciones de IA ha sido limitado temporalmente por un administrador.</span>
           </div>
@@ -471,7 +474,6 @@ export default function Home() {
                     </CardHeader>
                     <CardContent>
                       <span className="text-4xl font-black">{globalTodayStats?.recommendationRequests || 0}</span>
-                      <p className="text-xs text-muted-foreground mt-1">Interacciones con Gemini</p>
                     </CardContent>
                   </Card>
 
@@ -498,8 +500,8 @@ export default function Home() {
                           <tr>
                             <th className="px-6 py-4">Usuario / ID</th>
                             <th className="px-6 py-4">Consultas</th>
-                            <th className="px-6 py-4">Rol / Estado</th>
-                            <th className="px-6 py-4">Última Conexión</th>
+                            <th className="px-6 py-4">Estado / Rol</th>
+                            <th className="px-6 py-4">Registro y Conexión</th>
                             <th className="px-6 py-4">Acciones</th>
                           </tr>
                         </thead>
@@ -525,25 +527,23 @@ export default function Home() {
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col gap-1">
-                                    {u.isAdmin ? (
-                                      <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Administrador</span>
-                                    ) : (
-                                      <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">Usuario</span>
-                                    )}
                                     <div className="flex gap-1">
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold w-fit ${u.status === 'banned' ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
-                                        {u.status === 'banned' ? 'Suspendido' : 'Activo'}
-                                      </span>
-                                      {u.isRestricted && (
-                                        <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold w-fit">IA Pausada</span>
-                                      )}
+                                      {u.isAdmin && <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold">ADMIN</span>}
+                                      {u.isRestricted && <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold">PAUSADO</span>}
+                                      {u.status === 'active' && !u.isAdmin && !u.isRestricted && <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full text-[10px] font-bold">ACTIVO</span>}
                                     </div>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Clock className="w-3 h-3" />
-                                    {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendiente'}
+                                  <div className="flex flex-col gap-1 text-[10px] text-muted-foreground font-medium">
+                                    <div className="flex items-center gap-1.5">
+                                      <CalendarDays className="w-3 h-3 text-primary" />
+                                      <span>Unido: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Desconocido'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className="w-3 h-3 text-accent" />
+                                      <span>Última vez: {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendiente'}</span>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -551,9 +551,9 @@ export default function Home() {
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
-                                      className={`h-8 w-8 ${u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500'}`}
+                                      className={`h-8 w-8 transition-colors ${u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500'}`}
                                       onClick={() => handleToggleRestriction(u.id, !!u.isRestricted)}
-                                      title={u.isRestricted ? "Habilitar IA" : "Restringir IA Hoy"}
+                                      title={u.isRestricted ? "Habilitar IA" : "Pausar IA"}
                                       disabled={u.id === user.uid}
                                     >
                                       {u.isRestricted ? <ZapOff className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
@@ -563,7 +563,7 @@ export default function Home() {
                                       size="icon" 
                                       className="h-8 w-8 text-muted-foreground hover:text-accent"
                                       onClick={() => handleToggleAdmin(u.id, !!u.isAdmin)}
-                                      title={u.isAdmin ? "Degradar a Usuario" : "Promocionar a Admin"}
+                                      title={u.isAdmin ? "Quitar Admin" : "Hacer Admin"}
                                       disabled={u.id === user.uid}
                                     >
                                       {u.isAdmin ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -584,7 +584,7 @@ export default function Home() {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados en el sistema</td>
+                              <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados</td>
                             </tr>
                           )}
                         </tbody>
