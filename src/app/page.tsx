@@ -37,7 +37,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -67,13 +67,13 @@ export default function Home() {
   
   const { data: userData } = useDoc(userDocRef);
 
-  // Lógica de administrador con bypass por correo para cuotas agotadas
+  // Lógica de administrador con bypass por correo
   const isAdmin = useMemo(() => {
     if (!user) return false;
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Sincronización del perfil del usuario
+  // Sincronización del perfil del usuario (Mejorada para evitar reseteos)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
@@ -82,18 +82,32 @@ export default function Home() {
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
-      setDocumentNonBlocking(userRef, {
-        email: user.email,
-        id: user.uid,
-        lastLogin: serverTimestamp(),
-        createdAt: userData?.createdAt || realCreationDate,
-        isAdmin: isAdmin,
-        status: userData?.status || 'active',
-        recommendationCount: userData?.recommendationCount ?? 0,
-        isRestricted: userData?.isRestricted ?? false
-      }, { merge: true });
+      // Solo sincronizamos campos básicos. NO sobreescribimos contadores o permisos aquí.
+      const syncProfile = async () => {
+        const snap = await getDoc(userRef);
+        const currentData = snap.data();
+
+        const updateData: any = {
+          email: user.email,
+          id: user.uid,
+          lastLogin: serverTimestamp(),
+        };
+
+        // Solo establecemos valores iniciales si el documento NO existe
+        if (!snap.exists()) {
+          updateData.createdAt = realCreationDate;
+          updateData.isAdmin = user.email === 'id00825865@usal.es';
+          updateData.status = 'active';
+          updateData.recommendationCount = 0;
+          updateData.isRestricted = false;
+        }
+
+        setDocumentNonBlocking(userRef, updateData, { merge: true });
+      };
+
+      syncProfile();
     }
-  }, [user, db, isAdmin, userData?.createdAt]);
+  }, [user, db]);
 
   // Consultas de películas
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -108,29 +122,26 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración
+  // Panel de administración - Consulta simplificada para ver a todos
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios en el cliente, poniendo al usuario actual primero
+  // Ordenamos los usuarios en el cliente
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
     
-    // Separamos el usuario actual del resto
     const currentUserProfile = rawUsers.find(u => u.id === user.uid);
     const otherUsers = rawUsers.filter(u => u.id !== user.uid);
 
-    // Ordenamos los demás por última conexión
     const sortedOthers = [...otherUsers].sort((a, b) => {
       const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : new Date(a.lastLogin || 0).getTime();
       const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : new Date(b.lastLogin || 0).getTime();
       return dateB - dateA;
     });
 
-    // Devolvemos el usuario actual primero si existe en la lista, seguido de los demás
     return currentUserProfile ? [currentUserProfile, ...sortedOthers] : sortedOthers;
   }, [rawUsers, user]);
 
@@ -178,6 +189,7 @@ export default function Home() {
       setRecommendations(results);
       
       if (db && user) {
+        // Actualización atómica de estadísticas
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
         const userRef = doc(db, 'users', user.uid);
@@ -204,7 +216,7 @@ export default function Home() {
     updateDocumentNonBlocking(ref, { isRestricted: !currentRestricted });
     toast({ 
       title: !currentRestricted ? "Usuario restringido" : "Acceso restaurado", 
-      description: !currentRestricted ? "El usuario no podrá usar la IA hasta que lo habilites." : "El usuario puede volver a usar la IA."
+      description: !currentRestricted ? "El usuario no podrá usar la IA." : "Acceso restaurado."
     });
   };
 
@@ -219,7 +231,6 @@ export default function Home() {
 
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
-    
     let lastLoginDate: Date;
     if (lastLogin instanceof Timestamp) {
       lastLoginDate = lastLogin.toDate();
@@ -228,7 +239,6 @@ export default function Home() {
     } else {
       lastLoginDate = new Date(lastLogin);
     }
-
     if (isNaN(lastLoginDate.getTime())) return false;
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     return lastLoginDate > fiveMinutesAgo;
@@ -255,7 +265,7 @@ export default function Home() {
             <CardHeader className="text-center">
               <Ban className="w-12 h-12 text-destructive mx-auto mb-4" />
               <CardTitle>Cuenta Suspendida</CardTitle>
-              <p className="text-muted-foreground mt-2">Tu acceso a ReelRecs ha sido restringido por un administrador.</p>
+              <p className="text-muted-foreground mt-2">Tu acceso ha sido restringido.</p>
               <Button variant="outline" className="mt-4" onClick={handleSignOut}>Cerrar Sesión</Button>
             </CardHeader>
           </Card>
