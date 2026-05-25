@@ -74,7 +74,7 @@ export default function Home() {
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Sincronización del perfil del usuario (Mejorada para persistencia)
+  // Sincronización del perfil del usuario (Mejorada para persistencia y visibilidad)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
@@ -83,20 +83,19 @@ export default function Home() {
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
-      // Forzamos la creación/actualización con set merge para asegurar campos de ordenación
+      // Forzamos la creación/actualización con set merge para asegurar que aparezcan en la tabla del admin
       setDocumentNonBlocking(userRef, {
         email: user.email,
         id: user.uid,
-        lastLogin: serverTimestamp(),
-        // Solo inicializamos estos si no existen para no sobreescribir
+        lastLogin: serverTimestamp(), // Campo crítico para que la consulta orderBy lo detecte
         createdAt: userData?.createdAt || realCreationDate,
-        isAdmin: isAdmin, // El bypass también se guarda si entra el admin
+        isAdmin: isAdmin,
         status: userData?.status || 'active',
-        recommendationCount: userData?.recommendationCount || 0,
-        isRestricted: userData?.isRestricted || false
+        recommendationCount: userData?.recommendationCount ?? 0,
+        isRestricted: userData?.isRestricted ?? false
       }, { merge: true });
     }
-  }, [user, db, isAdmin, userData?.createdAt, userData?.status, userData?.recommendationCount, userData?.isRestricted]);
+  }, [user, db, isAdmin, userData?.createdAt]);
 
   // Consultas de películas
   const watchedMoviesQuery = useMemoFirebase(() => {
@@ -111,7 +110,7 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración (Ordenado por el campo que ahora aseguramos)
+  // Panel de administración (Ordenado por última conexión)
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
@@ -166,7 +165,7 @@ export default function Home() {
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
         
-        // Actualización de contador de usuario (Usamos set merge para evitar errores de persistencia)
+        // Actualización de contador de usuario
         const userRef = doc(db, 'users', user.uid);
         setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
       }
@@ -207,7 +206,18 @@ export default function Home() {
 
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
-    const lastLoginDate = lastLogin.seconds ? new Date(lastLogin.seconds * 1000) : new Date(lastLogin);
+    // Manejo de Firebase Timestamp vs Fecha plana
+    let lastLoginDate: Date;
+    if (lastLogin.seconds) {
+      lastLoginDate = new Date(lastLogin.seconds * 1000);
+    } else if (lastLogin instanceof Date) {
+      lastLoginDate = lastLogin;
+    } else {
+      lastLoginDate = new Date(lastLogin);
+    }
+
+    if (isNaN(lastLoginDate.getTime())) return false;
+
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     return lastLoginDate > fiveMinutesAgo;
   };
@@ -563,7 +573,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <Clock className="w-3 h-3 text-accent" />
-                                      <span>Última vez: {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendiente'}</span>
+                                      <span>Última vez: {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
                                     </div>
                                   </div>
                                 </td>
