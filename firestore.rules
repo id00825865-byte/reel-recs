@@ -17,23 +17,23 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Regla para el usuario y todas sus subcolecciones
-    match /users/{userId}/{allPaths=**} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId);
-    }
-
-    // Permitir a administradores listar la colección de usuarios
+    // Reglas para la colección de usuarios
     match /users/{userId} {
-      allow list: if isAdmin();
-      allow read: if isOwner(userId) || isAdmin();
+      // Un usuario solo puede escribir sus propios datos
       allow write: if isOwner(userId);
+      // Un usuario puede leer sus datos, o un admin puede leer los de cualquiera
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Reglas para subcolecciones (watchedMovies, watchlist)
+      match /{allPaths=**} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId);
+      }
     }
 
-    // Regla para la colección global de películas (si existiera)
-    match /movies/{movieId} {
-      allow read: if true;
-      allow write: if false;
+    // Regla específica para que el admin pueda listar la colección completa de usuarios
+    match /users {
+      allow list: if isAdmin();
     }
   }
 }

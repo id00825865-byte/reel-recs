@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, ShieldCheck, Users } from 'lucide-react';
+import { Film, Search, Loader2, Sparkles, LogOut, User as UserIcon, History, Bookmark, Sparkle, ShieldCheck, Users, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
@@ -40,23 +40,31 @@ export default function Home() {
     return doc(db, 'users', user.uid);
   }, [db, user]);
   
-  // Obtenemos los datos y el estado de carga del documento de usuario
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
-  // Asegurar que el perfil del usuario existe en Firestore sin sobrescribir datos existentes
+  // Efecto para asegurar que el perfil del usuario existe y registrar su conexión
   useEffect(() => {
-    // Solo actuamos si el usuario está autenticado, la carga de auth terminó
-    // Y Firestore nos confirma explícitamente que el documento no existe (userData === null)
-    if (user && db && !isUserDataLoading && userData === null && !isUserLoading) {
-      const newUserRef = doc(db, 'users', user.uid);
-      setDoc(newUserRef, {
-        email: user.email,
-        createdAt: serverTimestamp(),
-        id: user.uid,
-        isAdmin: false // Por defecto no es admin al CREARLO por primera vez
-      }, { merge: true });
+    if (user && db && !isUserDataLoading && !isUserLoading) {
+      // Si el documento no existe, lo creamos. Si existe, actualizamos la última conexión.
+      const userRef = doc(db, 'users', user.uid);
+      
+      if (!userData) {
+        setDoc(userRef, {
+          email: user.email,
+          createdAt: serverTimestamp(),
+          lastLogin: serverTimestamp(),
+          id: user.uid,
+          isAdmin: false
+        }, { merge: true });
+      } else {
+        // Actualizamos solo el último login si ya existe el perfil
+        setDoc(userRef, { 
+          lastLogin: serverTimestamp(),
+          email: user.email // Aseguramos que el email esté presente
+        }, { merge: true });
+      }
     }
-  }, [user, db, userData, isUserDataLoading, isUserLoading]);
+  }, [user, db, !!userData, isUserDataLoading, isUserLoading]);
 
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -82,10 +90,11 @@ export default function Home() {
   const { data: watchlistMovies } = useCollection(watchlistQuery);
   const watchlistIds = useMemo(() => watchlistMovies?.map(m => getStableId(m.title)) || [], [watchlistMovies]);
 
-  // Consulta para el panel de administración (solo se activa si es admin)
+  // Consulta para el panel de administración: listamos a todos los usuarios
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !userData?.isAdmin) return null;
-    return query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    // Quitamos el orderBy temporalmente para asegurar que vemos a todos aunque no tengan createdAt
+    return collection(db, 'users');
   }, [db, userData?.isAdmin]);
   const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
@@ -369,17 +378,17 @@ export default function Home() {
 
                 <Card className="bg-card/50 border-border/30">
                   <CardHeader>
-                    <CardTitle className="font-headline text-2xl font-bold">Registro de Usuarios (Logins)</CardTitle>
+                    <CardTitle className="font-headline text-2xl font-bold">Gestión de Usuarios Registrados</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="relative overflow-x-auto rounded-xl border border-border/30">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
                           <tr>
-                            <th className="px-6 py-4">ID de Usuario</th>
-                            <th className="px-6 py-4">Email</th>
+                            <th className="px-6 py-4">Usuario</th>
                             <th className="px-6 py-4">Rol</th>
-                            <th className="px-6 py-4">Fecha de Registro</th>
+                            <th className="px-6 py-4">Registro</th>
+                            <th className="px-6 py-4">Última Conexión</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/20">
@@ -390,8 +399,12 @@ export default function Home() {
                           ) : allUsers && allUsers.length > 0 ? (
                             allUsers.map((u) => (
                               <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
-                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{u.id}</td>
-                                <td className="px-6 py-4 font-bold">{u.email}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold">{u.email || 'Sin email'}</span>
+                                    <span className="text-[10px] font-mono text-muted-foreground">{u.id}</span>
+                                  </div>
+                                </td>
                                 <td className="px-6 py-4">
                                   {u.isAdmin ? (
                                     <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold">Administrador</span>
@@ -399,14 +412,20 @@ export default function Home() {
                                     <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold">Usuario</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 text-muted-foreground">
-                                  {u.createdAt ? new Date(u.createdAt.seconds * 1000).toLocaleString() : 'Reciente'}
+                                <td className="px-6 py-4 text-muted-foreground text-xs">
+                                  {u.createdAt ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />
+                                    {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'Pendiente'}
+                                  </div>
                                 </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados</td>
+                              <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados en el sistema</td>
                             </tr>
                           )}
                         </tbody>
