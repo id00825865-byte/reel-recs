@@ -38,7 +38,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useAuth, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, query, orderBy, doc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { deleteDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -66,7 +66,7 @@ export default function Home() {
     return doc(db, 'users', user.uid);
   }, [db, user]);
   
-  const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
+  const { data: userData } = useDoc(userDocRef);
 
   // Lógica de administrador con bypass por correo para cuotas agotadas
   const isAdmin = useMemo(() => {
@@ -74,7 +74,7 @@ export default function Home() {
     return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
   }, [userData, user]);
 
-  // Sincronización del perfil del usuario (Mejorada para persistencia y visibilidad)
+  // Sincronización del perfil del usuario
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
@@ -83,11 +83,10 @@ export default function Home() {
         ? new Date(user.metadata.creationTime).toISOString() 
         : new Date().toISOString();
 
-      // Forzamos la creación/actualización con set merge para asegurar que aparezcan en la tabla del admin
       setDocumentNonBlocking(userRef, {
         email: user.email,
         id: user.uid,
-        lastLogin: serverTimestamp(), // Campo crítico para que la consulta orderBy lo detecte
+        lastLogin: serverTimestamp(),
         createdAt: userData?.createdAt || realCreationDate,
         isAdmin: isAdmin,
         status: userData?.status || 'active',
@@ -110,12 +109,22 @@ export default function Home() {
   }, [db, user]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración (Ordenado por última conexión)
+  // Panel de administración (Sin orderBy para asegurar que salgan todos los usuarios)
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
-    return query(collection(db, 'users'), orderBy('lastLogin', 'desc'));
+    return collection(db, 'users');
   }, [db, isAdmin]);
-  const { data: allUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
+  const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
+
+  // Ordenamos los usuarios en el cliente para evitar que los que no tienen lastLogin desaparezcan
+  const allUsers = useMemo(() => {
+    if (!rawUsers) return [];
+    return [...rawUsers].sort((a, b) => {
+      const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : new Date(a.lastLogin || 0).getTime();
+      const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : new Date(b.lastLogin || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [rawUsers]);
 
   // Estadísticas globales para el admin
   const statsDocRef = useMemoFirebase(() => {
@@ -161,15 +170,11 @@ export default function Home() {
       setRecommendations(results);
       
       if (db && user) {
-        // Actualización de estadísticas globales
         const statRef = doc(db, 'globalStats', todayStr);
         setDocumentNonBlocking(statRef, { recommendationRequests: increment(1) }, { merge: true });
-        
-        // Actualización de contador de usuario
         const userRef = doc(db, 'users', user.uid);
         setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
       }
-      
       setActiveTab('explore');
     } catch (error: any) {
       toast({ title: "Error en la búsqueda", description: error.message, variant: "destructive" });
@@ -206,18 +211,17 @@ export default function Home() {
 
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
-    // Manejo de Firebase Timestamp vs Fecha plana
+    
     let lastLoginDate: Date;
-    if (lastLogin.seconds) {
+    if (lastLogin instanceof Timestamp) {
+      lastLoginDate = lastLogin.toDate();
+    } else if (lastLogin.seconds) {
       lastLoginDate = new Date(lastLogin.seconds * 1000);
-    } else if (lastLogin instanceof Date) {
-      lastLoginDate = lastLogin;
     } else {
       lastLoginDate = new Date(lastLogin);
     }
 
     if (isNaN(lastLoginDate.getTime())) return false;
-
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     return lastLoginDate > fiveMinutesAgo;
   };
@@ -573,7 +577,7 @@ export default function Home() {
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <Clock className="w-3 h-3 text-accent" />
-                                      <span>Última vez: {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
+                                      <span>Última vez: {u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Pendiente'}</span>
                                     </div>
                                   </div>
                                 </td>
