@@ -39,19 +39,23 @@ export default function Home() {
     if (!db || !user) return null;
     return doc(db, 'users', user.uid);
   }, [db, user]);
-  const { data: userData } = useDoc(userDocRef);
+  
+  // Obtenemos los datos y el estado de carga del documento de usuario
+  const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
-  // Asegurar que el perfil del usuario existe en Firestore
+  // Asegurar que el perfil del usuario existe en Firestore sin sobrescribir datos existentes
   useEffect(() => {
-    if (user && db && !userData && !isUserLoading) {
+    // Solo actuamos si el usuario está autenticado, la carga inicial de auth terminó,
+    // la carga del documento de Firestore terminó Y el documento es null (no existe)
+    if (user && db && !isUserDataLoading && userData === null && !isUserLoading) {
       setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         createdAt: serverTimestamp(),
         id: user.uid,
-        isAdmin: false // Por defecto no es admin
+        isAdmin: false // Por defecto no es admin al CREARLO por primera vez
       }, { merge: true });
     }
-  }, [user, db, userData, isUserLoading]);
+  }, [user, db, userData, isUserDataLoading, isUserLoading]);
 
   const watchedMoviesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -116,7 +120,7 @@ export default function Home() {
     signOut(auth);
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || (user && isUserDataLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
