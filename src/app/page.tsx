@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
   Film, 
   Search, 
@@ -22,17 +22,13 @@ import {
   Bookmark, 
   Sparkle, 
   ShieldCheck, 
-  Users, 
-  Clock, 
   Trash2, 
   UserPlus, 
   UserMinus,
   Ban,
-  MessageSquareShare,
   Zap,
   ZapOff,
   AlertTriangle,
-  CalendarDays,
   CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -61,7 +57,7 @@ export default function Home() {
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  // Documento del perfil del usuario actual
+  // Perfil del usuario actual - Estrictamente desde Firestore
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, 'users', user.uid);
@@ -69,7 +65,7 @@ export default function Home() {
   
   const { data: userData } = useDoc(userDocRef);
 
-  // Lógica de administrador estricta por base de datos
+  // Lógica de Admin: Basada solo en la base de datos
   const isAdmin = useMemo(() => userData?.isAdmin === true, [userData?.isAdmin]);
 
   // Sincronización del perfil (No destructiva)
@@ -86,12 +82,13 @@ export default function Home() {
               email: user.email,
               createdAt: new Date().toISOString(),
               lastLogin: serverTimestamp(),
-              isAdmin: false,
+              isAdmin: false, // Por defecto nadie es admin
               status: 'active',
               recommendationCount: 0,
               isRestricted: false,
             });
           } else {
+            // Solo actualizamos el login y el email para no sobreescribir isAdmin o isRestricted
             await setDoc(userRef, {
               email: user.email,
               lastLogin: serverTimestamp(),
@@ -119,16 +116,17 @@ export default function Home() {
   }, [db, user?.uid]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel Admin - Consulta de todos los usuarios
+  // Panel Admin - Todos los usuarios sin filtros
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
-  const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
+  const { data: rawUsers } = useCollection(allUsersQuery);
 
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
     return [...rawUsers].sort((a, b) => {
+      // El usuario actual siempre primero
       if (a.id === user.uid) return -1;
       if (b.id === user.uid) return 1;
       const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : 0;
@@ -188,16 +186,16 @@ export default function Home() {
     }
   };
 
-  const handleToggleAdmin = (targetUserId: string, currentStatus: boolean) => {
+  const handleToggleAdmin = (targetUserId: string, currentIsAdmin: boolean) => {
     if (!db) return;
-    updateDocumentNonBlocking(doc(db, 'users', targetUserId), { isAdmin: !currentStatus });
-    toast({ title: "Permisos actualizados" });
+    updateDocumentNonBlocking(doc(db, 'users', targetUserId), { isAdmin: !currentIsAdmin });
+    toast({ title: !currentIsAdmin ? "Rol cambiado a ADMIN" : "Rol cambiado a USUARIO" });
   };
 
   const handleToggleRestriction = (targetUserId: string, currentRestricted: boolean) => {
     if (!db) return;
     updateDocumentNonBlocking(doc(db, 'users', targetUserId), { isRestricted: !currentRestricted });
-    toast({ title: !currentRestricted ? "IA Pausada" : "IA Habilitada" });
+    toast({ title: !currentRestricted ? "IA Pausada para este usuario" : "IA Habilitada para este usuario" });
   };
 
   const handleToggleStatus = (targetUserId: string, currentStatus: string) => {
@@ -409,7 +407,7 @@ export default function Home() {
                       <tr>
                         <th className="px-6 py-4">Usuario</th>
                         <th className="px-6 py-4">Uso IA</th>
-                        <th className="px-6 py-4">Configuración / Estado</th>
+                        <th className="px-6 py-4">Rol / Estado IA / Cuenta</th>
                         <th className="px-6 py-4">Última Vez</th>
                         <th className="px-6 py-4">Acciones</th>
                       </tr>
