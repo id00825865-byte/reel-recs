@@ -69,13 +69,10 @@ export default function Home() {
   
   const { data: userData } = useDoc(userDocRef);
 
-  // Lógica de administrador: Documento en DB O bypass por correo maestro
-  const isAdmin = useMemo(() => {
-    if (!user) return false;
-    return userData?.isAdmin === true || user.email === 'id00825865@usal.es';
-  }, [userData?.isAdmin, user?.email]);
+  // Lógica de administrador estricta por base de datos
+  const isAdmin = useMemo(() => userData?.isAdmin === true, [userData?.isAdmin]);
 
-  // Sincronización del perfil del usuario (Garantiza creación del documento sin sobreescribir permisos)
+  // Sincronización del perfil (No destructiva)
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
@@ -83,23 +80,18 @@ export default function Home() {
       const syncProfile = async () => {
         try {
           const snap = await getDoc(userRef);
-          
           if (!snap.exists()) {
-            // Documento totalmente nuevo: Inicializamos con todo
-            const initialData = {
+            await setDoc(userRef, {
               id: user.uid,
               email: user.email,
               createdAt: new Date().toISOString(),
               lastLogin: serverTimestamp(),
-              isAdmin: user.email === 'id00825865@usal.es', // Auto-admin para el maestro
+              isAdmin: false,
               status: 'active',
               recommendationCount: 0,
               isRestricted: false,
-            };
-            await setDoc(userRef, initialData);
+            });
           } else {
-            // Usuario ya existe: SOLO actualizamos login y email. 
-            // NUNCA tocamos isAdmin, isRestricted o status aquí para no resetear los cambios del panel.
             await setDoc(userRef, {
               email: user.email,
               lastLogin: serverTimestamp(),
@@ -127,30 +119,24 @@ export default function Home() {
   }, [db, user?.uid]);
   const { data: watchlistMovies } = useCollection(watchlistQuery);
 
-  // Panel de administración - Consulta limpia de todos los usuarios
+  // Panel Admin - Consulta de todos los usuarios
   const allUsersQuery = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return collection(db, 'users');
   }, [db, isAdmin]);
   const { data: rawUsers, isLoading: isLoadingAdmin } = useCollection(allUsersQuery);
 
-  // Ordenamos los usuarios en el cliente: Tú primero, luego por login
   const allUsers = useMemo(() => {
     if (!rawUsers || !user) return [];
-    
-    const currentUserProfile = rawUsers.find(u => u.id === user.uid);
-    const otherUsers = rawUsers
-      .filter(u => u.id !== user.uid)
-      .sort((a, b) => {
-        const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : 0;
-        const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : 0;
-        return dateB - dateA;
-      });
-
-    return currentUserProfile ? [currentUserProfile, ...otherUsers] : otherUsers;
+    return [...rawUsers].sort((a, b) => {
+      if (a.id === user.uid) return -1;
+      if (b.id === user.uid) return 1;
+      const dateA = a.lastLogin instanceof Timestamp ? a.lastLogin.toDate().getTime() : 0;
+      const dateB = b.lastLogin instanceof Timestamp ? b.lastLogin.toDate().getTime() : 0;
+      return dateB - dateA;
+    });
   }, [rawUsers, user?.uid]);
 
-  // Estadísticas globales para el admin
   const statsDocRef = useMemoFirebase(() => {
     if (!db || !isAdmin) return null;
     return doc(db, 'globalStats', todayStr);
@@ -173,11 +159,7 @@ export default function Home() {
     if (!preferences.trim()) return;
 
     if (userData?.isRestricted) {
-      toast({ 
-        title: "Acceso denegado", 
-        description: "Tu acceso a la IA ha sido pausado por un administrador.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Acceso restringido", description: "No puedes usar la IA en este momento.", variant: "destructive" });
       return;
     }
 
@@ -199,9 +181,8 @@ export default function Home() {
         const userRef = doc(db, 'users', user.uid);
         setDocumentNonBlocking(userRef, { recommendationCount: increment(1) }, { merge: true });
       }
-      setActiveTab('explore');
     } catch (error: any) {
-      toast({ title: "Error en la búsqueda", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -209,26 +190,27 @@ export default function Home() {
 
   const handleToggleAdmin = (targetUserId: string, currentStatus: boolean) => {
     if (!db) return;
-    const ref = doc(db, 'users', targetUserId);
-    updateDocumentNonBlocking(ref, { isAdmin: !currentStatus });
-    toast({ title: "Rol actualizado", description: `Usuario ${!currentStatus ? 'promocionado' : 'degradado'}` });
+    updateDocumentNonBlocking(doc(db, 'users', targetUserId), { isAdmin: !currentStatus });
+    toast({ title: "Permisos actualizados" });
   };
 
   const handleToggleRestriction = (targetUserId: string, currentRestricted: boolean) => {
     if (!db) return;
-    const ref = doc(db, 'users', targetUserId);
-    updateDocumentNonBlocking(ref, { isRestricted: !currentRestricted });
-    toast({ 
-      title: !currentRestricted ? "IA Pausada" : "Acceso restaurado", 
-      description: !currentRestricted ? "El usuario ya no puede usar la IA." : "El usuario puede volver a usar la IA."
-    });
+    updateDocumentNonBlocking(doc(db, 'users', targetUserId), { isRestricted: !currentRestricted });
+    toast({ title: !currentRestricted ? "IA Pausada" : "IA Habilitada" });
+  };
+
+  const handleToggleStatus = (targetUserId: string, currentStatus: string) => {
+    if (!db) return;
+    const newStatus = currentStatus === 'active' ? 'banned' : 'active';
+    updateDocumentNonBlocking(doc(db, 'users', targetUserId), { status: newStatus });
+    toast({ title: newStatus === 'banned' ? "Usuario baneado" : "Usuario activado" });
   };
 
   const handleDeleteUser = async (targetUserId: string) => {
-    if (!db || !confirm('¿Estás seguro de eliminar este perfil?')) return;
-    const ref = doc(db, 'users', targetUserId);
-    deleteDocumentNonBlocking(ref);
-    toast({ title: "Usuario eliminado", description: "El perfil ha sido borrado." });
+    if (!db || !confirm('¿Eliminar usuario definitivamente?')) return;
+    deleteDocumentNonBlocking(doc(db, 'users', targetUserId));
+    toast({ title: "Usuario eliminado" });
   };
 
   const handleSignOut = () => {
@@ -240,16 +222,8 @@ export default function Home() {
 
   const isOnline = (lastLogin: any) => {
     if (!lastLogin) return false;
-    let lastLoginDate: Date;
-    if (lastLogin instanceof Timestamp) {
-      lastLoginDate = lastLogin.toDate();
-    } else if (lastLogin.seconds) {
-      lastLoginDate = new Date(lastLogin.seconds * 1000);
-    } else {
-      lastLoginDate = new Date(lastLogin);
-    }
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    return lastLoginDate > fiveMinutesAgo;
+    const lastLoginDate = lastLogin instanceof Timestamp ? lastLogin.toDate() : new Date(lastLogin);
+    return (Date.now() - lastLoginDate.getTime()) < 5 * 60 * 1000;
   };
 
   if (isUserLoading) {
@@ -269,196 +243,126 @@ export default function Home() {
           <h1 className="font-headline text-5xl font-black">ReelRecs</h1>
         </div>
         {userData?.status === 'banned' ? (
-          <Card className="max-w-md bg-destructive/10 border-destructive">
+          <Card className="max-w-md border-destructive bg-destructive/5">
             <CardHeader className="text-center">
               <Ban className="w-12 h-12 text-destructive mx-auto mb-4" />
-              <CardTitle>Cuenta Suspendida</CardTitle>
-              <p className="text-muted-foreground mt-2">Tu acceso ha sido restringido por un administrador.</p>
+              <CardTitle>Acceso Denegado</CardTitle>
+              <p className="text-muted-foreground mt-2">Tu cuenta ha sido suspendida.</p>
               <Button variant="outline" className="mt-4" onClick={handleSignOut}>Cerrar Sesión</Button>
             </CardHeader>
           </Card>
-        ) : (
-          <AuthForm />
-        )}
+        ) : <AuthForm />}
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center">
+    <main className="min-h-screen bg-background">
       <Toaster />
-      
-      <nav className="w-full border-b border-border/10 bg-card/30 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+      <nav className="border-b border-border/10 bg-card/30 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('explore')}>
           <Film className="w-6 h-6 text-primary" />
           <span className="font-headline text-2xl font-bold">ReelRecs</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border/50">
-            {isAdmin ? (
-              <ShieldCheck className="w-4 h-4 text-accent" />
-            ) : (
-              <UserIcon className="w-4 h-4 text-primary" />
-            )}
+            {isAdmin ? <ShieldCheck className="w-4 h-4 text-accent" /> : <UserIcon className="w-4 h-4 text-primary" />}
             <span className="text-sm font-medium">{user.email}</span>
-            {isAdmin && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-bold">ADMIN</span>}
           </div>
-          <Button variant="ghost" size="icon" onClick={handleSignOut}>
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={handleSignOut}><LogOut className="w-5 h-5" /></Button>
         </div>
       </nav>
 
-      <header className="w-full max-w-7xl px-6 pt-12 pb-8 flex flex-col items-center text-center">
-        {userData?.isRestricted && (
-          <div className="w-full max-w-2xl mb-6 bg-orange-500/10 border border-orange-500/20 text-orange-500 p-4 rounded-xl flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-bold">Tu acceso a la IA ha sido pausado. No puedes realizar búsquedas.</span>
-          </div>
-        )}
-        <h1 className="font-headline text-4xl md:text-6xl font-black mb-4 tracking-tight">
-          ¿Qué <span className="text-primary italic">cine</span> te apetece?
-        </h1>
-        
-        <section className="w-full max-w-4xl mt-8">
-          <form onSubmit={handleSearch} className="space-y-6">
-            <div className="relative flex flex-col md:flex-row gap-3 p-2 bg-card rounded-2xl border border-border/50 shadow-2xl">
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <header className="text-center mb-12">
+          {userData?.isRestricted && (
+            <div className="mb-6 inline-flex items-center gap-2 bg-orange-500/10 text-orange-500 px-4 py-2 rounded-full text-sm font-bold border border-orange-500/20">
+              <AlertTriangle className="w-4 h-4" /> IA Pausada por administración
+            </div>
+          )}
+          <h1 className="font-headline text-4xl md:text-6xl font-black mb-4">¿Qué te apetece <span className="text-primary italic">ver</span> hoy?</h1>
+          
+          <form onSubmit={handleSearch} className="max-w-3xl mx-auto mt-8 space-y-4">
+            <div className="flex gap-2 p-2 bg-card rounded-2xl border border-border/50 shadow-xl">
               <Input
                 placeholder="Busca por género, humor o películas similares..."
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
-                className="flex-1 bg-transparent border-none text-lg h-14 focus-visible:ring-0 px-4"
+                className="bg-transparent border-none text-lg h-12 focus-visible:ring-0"
               />
-              <Button 
-                type="submit" 
-                size="lg" 
-                className="h-14 md:px-8 bg-primary rounded-xl gap-2 font-bold"
-                disabled={loading || !preferences.trim() || userData?.isRestricted}
-              >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Buscar</>}
+              <Button type="submit" disabled={loading || !preferences.trim() || userData?.isRestricted} className="h-12 px-6">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
               </Button>
             </div>
-
-            <div className="flex flex-wrap justify-center gap-8">
-              <div className="flex flex-col items-center gap-2">
-                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Estado de Ánimo</Label>
-                <Select value={mood} onValueChange={setMood}>
-                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
-                    <SelectValue placeholder="Ánimo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Cualquier ánimo</SelectItem>
-                    <SelectItem value="Happy">Alegre</SelectItem>
-                    <SelectItem value="Sad">Triste</SelectItem>
-                    <SelectItem value="Exciting">Acción / Emocionante</SelectItem>
-                    <SelectItem value="Scary">Terror / Miedo</SelectItem>
-                    <SelectItem value="Romantic">Romántico</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col items-center gap-2">
-                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Duración</Label>
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
-                    <SelectValue placeholder="Tiempo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Cualquier tiempo</SelectItem>
-                    <SelectItem value="Under 90 min">Menos de 90 min</SelectItem>
-                    <SelectItem value="Under 120 min">Menos de 120 min</SelectItem>
-                    <SelectItem value="More than 120 min">Películas largas (+2h)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col items-center gap-2">
-                <Label className="text-muted-foreground text-xs uppercase tracking-wider font-bold">Plataforma</Label>
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="w-[160px] bg-card/40 border-border/30">
-                    <SelectValue placeholder="Plataforma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Cualquier plataforma</SelectItem>
-                    <SelectItem value="Netflix">Netflix</SelectItem>
-                    <SelectItem value="Disney+">Disney+</SelectItem>
-                    <SelectItem value="HBO Max">HBO Max</SelectItem>
-                    <SelectItem value="Prime Video">Prime Video</SelectItem>
-                    <SelectItem value="Apple TV+">Apple TV+</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            
+            <div className="flex flex-wrap justify-center gap-4">
+              <Select value={mood} onValueChange={setMood}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Ánimo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier ánimo</SelectItem>
+                  <SelectItem value="Happy">Alegre</SelectItem>
+                  <SelectItem value="Sad">Triste</SelectItem>
+                  <SelectItem value="Exciting">Emocionante</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Duración" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier tiempo</SelectItem>
+                  <SelectItem value="Under 90 min">Cortas</SelectItem>
+                  <SelectItem value="More than 120 min">Largas (+2h)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={platform} onValueChange={setPlatform}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquier sitio</SelectItem>
+                  <SelectItem value="Netflix">Netflix</SelectItem>
+                  <SelectItem value="Prime Video">Prime Video</SelectItem>
+                  <SelectItem value="HBO Max">HBO Max</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </form>
-        </section>
-      </header>
+        </header>
 
-      <section className="w-full max-w-7xl px-6 pb-24 flex-1">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex justify-center mb-8">
-            <TabsList className="bg-secondary/40 h-12">
-              <TabsTrigger value="explore" className="px-6 data-[state=active]:bg-primary">Recomendaciones</TabsTrigger>
-              <TabsTrigger value="watchlist" className="px-6 data-[state=active]:bg-primary">Por ver</TabsTrigger>
-              <TabsTrigger value="history" className="px-6 data-[state=active]:bg-primary">Historial</TabsTrigger>
-              {isAdmin && (
-                <TabsTrigger value="admin" className="px-6 data-[state=active]:bg-accent text-accent data-[state=active]:text-white">
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Panel Admin
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </div>
+          <TabsList className="flex justify-center mb-8 bg-transparent gap-2">
+            <TabsTrigger value="explore" className="rounded-full px-6 data-[state=active]:bg-primary">Explorar</TabsTrigger>
+            <TabsTrigger value="watchlist" className="rounded-full px-6 data-[state=active]:bg-primary">Por ver</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-full px-6 data-[state=active]:bg-primary">Historial</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="admin" className="rounded-full px-6 data-[state=active]:bg-accent text-accent data-[state=active]:text-white">
+                <ShieldCheck className="w-4 h-4 mr-2" /> Administración
+              </TabsTrigger>
+            )}
+          </TabsList>
 
           <TabsContent value="explore">
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="aspect-[2/3] bg-card/30 rounded-2xl animate-pulse" />
+            {recommendations ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {recommendations.movies.map((m, i) => (
+                  <MovieCard 
+                    key={getStableId(m.title)} 
+                    movie={{...m, rating: watchedRatingsMap[getStableId(m.title)] || 0}} 
+                    index={i}
+                    isWatched={watchedIds.includes(getStableId(m.title))}
+                    isInWatchlist={watchlistIds.includes(getStableId(m.title))}
+                  />
                 ))}
-              </div>
-            ) : recommendations ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {recommendations.movies.map((movie, idx) => {
-                  const titleId = getStableId(movie.title);
-                  return (
-                    <MovieCard 
-                      key={titleId} 
-                      movie={{...movie, rating: watchedRatingsMap[titleId] || 0}} 
-                      index={idx}
-                      isWatched={watchedIds.includes(titleId)}
-                      isInWatchlist={watchlistIds.includes(titleId)}
-                    />
-                  );
-                })}
               </div>
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
                 <Sparkle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground">Usa el buscador para generar recomendaciones</p>
+                <p className="text-muted-foreground">Usa el buscador para ver recomendaciones</p>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="watchlist">
-            {watchlistMovies && watchlistMovies.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {watchlistMovies.map((movie, idx) => (
-                  <MovieCard 
-                    key={movie.id} 
-                    movie={{
-                      title: movie.title,
-                      posterUrl: movie.posterUrl,
-                      synopsis: movie.synopsis || "",
-                      year: movie.year,
-                      imdbRating: movie.imdbRating,
-                      duration: movie.duration,
-                      director: movie.director,
-                      actors: movie.actors,
-                      platforms: movie.platforms || [],
-                    }} 
-                    index={idx}
-                    isInWatchlist={true}
-                  />
-                ))}
+            {watchlistMovies?.length ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {watchlistMovies.map((m, i) => <MovieCard key={m.id} movie={m} index={i} isInWatchlist={true} />)}
               </div>
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
@@ -469,27 +373,9 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="history">
-            {watchedMovies && watchedMovies.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {watchedMovies.map((movie, idx) => (
-                  <MovieCard 
-                    key={movie.id} 
-                    movie={{
-                      title: movie.title,
-                      posterUrl: movie.posterUrl,
-                      synopsis: movie.synopsis || "",
-                      rating: movie.rating,
-                      year: movie.year,
-                      imdbRating: movie.imdbRating,
-                      duration: movie.duration,
-                      director: movie.director,
-                      actors: movie.actors,
-                      platforms: movie.platforms || [],
-                    }} 
-                    index={idx}
-                    isWatched={true}
-                  />
-                ))}
+            {watchedMovies?.length ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {watchedMovies.map((m, i) => <MovieCard key={m.id} movie={m} index={i} isWatched={true} />)}
               </div>
             ) : (
               <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-border/40">
@@ -501,175 +387,96 @@ export default function Home() {
 
           {isAdmin && (
             <TabsContent value="admin">
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="bg-card/50 border-border/30">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <Users className="w-4 h-4 text-primary" /> Total Usuarios
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <span className="text-4xl font-black">{allUsers?.length || 0}</span>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-card/50 border-border/30">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <MessageSquareShare className="w-4 h-4 text-green-500" /> Consultas IA (Hoy)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <span className="text-4xl font-black">{globalTodayStats?.recommendationRequests || 0}</span>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-card/50 border-border/30">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-accent" /> Staff
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <span className="text-4xl font-black">{allUsers?.filter(u => u.isAdmin).length || 0}</span>
-                    </CardContent>
-                  </Card>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <Card className="bg-card/50 border-border/30">
-                  <CardHeader>
-                    <CardTitle className="font-headline text-2xl font-bold">Gestión de Usuarios y Seguridad</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="relative overflow-x-auto rounded-xl border border-border/30">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
-                          <tr>
-                            <th className="px-6 py-4">Usuario</th>
-                            <th className="px-6 py-4">Consultas</th>
-                            <th className="px-6 py-4">Estado / Rol</th>
-                            <th className="px-6 py-4">Última Conexión</th>
-                            <th className="px-6 py-4">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/20">
-                          {isLoadingAdmin ? (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td>
-                            </tr>
-                          ) : allUsers && allUsers.length > 0 ? (
-                            allUsers.map((u) => (
-                              <tr key={u.id} className={cn("hover:bg-secondary/20 transition-colors", u.id === user.uid && "bg-primary/5")}>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold">{u.email || 'Sin email'}</span>
-                                      {u.id === user.uid && <span className="text-[8px] bg-primary/20 text-primary px-1 py-0.5 rounded font-black uppercase">Tú</span>}
-                                      {isOnline(u.lastLogin) && (
-                                        <div className="flex items-center gap-1 bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">
-                                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                                          En línea
-                                        </div>
-                                      )}
-                                    </div>
-                                    <span className="text-[10px] font-mono text-muted-foreground">{u.id}</span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <Sparkles className="w-3 h-3 text-primary" />
-                                    <span className="font-black text-lg">{u.recommendationCount || 0}</span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-wrap gap-1">
-                                    {u.isAdmin ? (
-                                      <span className="bg-accent/20 text-accent px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                        <ShieldCheck className="w-3 h-3" /> ADMIN
-                                      </span>
-                                    ) : (
-                                      <span className="bg-secondary/40 text-muted-foreground px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                        <UserIcon className="w-3 h-3" /> USUARIO
-                                      </span>
-                                    )}
-                                    
-                                    {u.isRestricted ? (
-                                      <span className="bg-orange-500/20 text-orange-500 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                        <ZapOff className="w-3 h-3" /> IA PAUSADA
-                                      </span>
-                                    ) : (
-                                      <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                        <Zap className="w-3 h-3" /> IA OK
-                                      </span>
-                                    )}
-
-                                    <span className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1",
-                                      u.status === 'active' ? "bg-blue-500/20 text-blue-500" : "bg-red-500/20 text-red-500"
-                                    )}>
-                                      {u.status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
-                                      {u.status === 'active' ? 'ACTIVO' : 'BANEADO'}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
-                                    <Clock className="w-3 h-3 text-primary" />
-                                    <span>{u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Nunca'}</span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className={cn("h-8 w-8 transition-colors", u.isRestricted ? 'text-orange-500' : 'text-muted-foreground hover:text-orange-500')}
-                                      onClick={() => handleToggleRestriction(u.id, !!u.isRestricted)}
-                                      title={u.isRestricted ? "Habilitar IA" : "Pausar IA"}
-                                      disabled={u.id === user.uid}
-                                    >
-                                      {u.isRestricted ? <ZapOff className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-8 w-8 text-muted-foreground hover:text-accent"
-                                      onClick={() => handleToggleAdmin(u.id, !!u.isAdmin)}
-                                      title={u.isAdmin ? "Quitar Admin" : "Hacer Admin"}
-                                      disabled={u.id === user.uid}
-                                    >
-                                      {u.isAdmin ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                                      onClick={() => handleDeleteUser(u.id)}
-                                      title="Eliminar Perfil"
-                                      disabled={u.id === user.uid}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No hay usuarios registrados</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Usuarios Totales</CardTitle></CardHeader>
+                  <CardContent><span className="text-4xl font-black">{allUsers.length}</span></CardContent>
+                </Card>
+                <Card className="bg-card/50 border-border/30">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Consultas IA Hoy</CardTitle></CardHeader>
+                  <CardContent><span className="text-4xl font-black">{globalTodayStats?.recommendationRequests || 0}</span></CardContent>
+                </Card>
+                <Card className="bg-card/50 border-border/30">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Staff</CardTitle></CardHeader>
+                  <CardContent><span className="text-4xl font-black">{allUsers.filter(u => u.isAdmin).length}</span></CardContent>
                 </Card>
               </div>
+
+              <Card className="bg-card/50 border-border/30 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-secondary/40 text-[10px] uppercase font-black text-muted-foreground">
+                      <tr>
+                        <th className="px-6 py-4">Usuario</th>
+                        <th className="px-6 py-4">Uso IA</th>
+                        <th className="px-6 py-4">Configuración / Estado</th>
+                        <th className="px-6 py-4">Última Vez</th>
+                        <th className="px-6 py-4">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                      {allUsers.map((u) => (
+                        <tr key={u.id} className={cn("hover:bg-secondary/10 transition-colors", u.id === user.uid && "bg-primary/5")}>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{u.email}</span>
+                                {u.id === user.uid && <span className="text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black">TÚ</span>}
+                                {isOnline(u.lastLogin) && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="En línea" />}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground font-mono">{u.id}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-3 h-3 text-primary" />
+                              <span className="font-black text-lg">{u.recommendationCount || 0}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {u.isAdmin ? (
+                                <Badge className="bg-accent text-white text-[9px] font-bold px-2 py-0.5 border-none">ADMIN</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] font-bold px-2 py-0.5">USUARIO</Badge>
+                              )}
+                              <Badge className={cn("text-[9px] font-bold px-2 py-0.5 border-none", u.isRestricted ? "bg-orange-500" : "bg-green-600")}>
+                                {u.isRestricted ? "IA PAUSADA" : "IA ACTIVA"}
+                              </Badge>
+                              <Badge className={cn("text-[9px] font-bold px-2 py-0.5 border-none", u.status === 'banned' ? "bg-red-600" : "bg-blue-600")}>
+                                {u.status === 'banned' ? "BANEADO" : "ACTIVO"}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-[10px] text-muted-foreground">
+                            {u.lastLogin ? (u.lastLogin instanceof Timestamp ? u.lastLogin.toDate().toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'Nunca'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleRestriction(u.id, !!u.isRestricted)} title="Restringir IA">
+                                {u.isRestricted ? <Zap className="w-4 h-4 text-green-500" /> : <ZapOff className="w-4 h-4 text-orange-500" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleAdmin(u.id, !!u.isAdmin)} disabled={u.id === user.uid} title="Cambiar Rol">
+                                {u.isAdmin ? <UserMinus className="w-4 h-4 text-muted-foreground" /> : <UserPlus className="w-4 h-4 text-accent" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleStatus(u.id, u.status)} disabled={u.id === user.uid} title="Banear/Activar">
+                                {u.status === 'banned' ? <CheckCircle2 className="w-4 h-4 text-blue-500" /> : <Ban className="w-4 h-4 text-red-500" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteUser(u.id)} disabled={u.id === user.uid} title="Borrar">
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </TabsContent>
           )}
         </Tabs>
-      </section>
+      </div>
     </main>
   );
 }

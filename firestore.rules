@@ -11,21 +11,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        // Permiso por documento (estándar)
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) ||
-        // Permiso por correo (bypass para emergencias de cuota)
-        request.auth.token.email == 'id00825865@usal.es'
-      );
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     match /users/{userId} {
-      allow write: if isOwner(userId) || isAdmin();
-      allow read: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
       
       match /{allPaths=**} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow write: if isOwner(userId) || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
