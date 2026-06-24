@@ -2,13 +2,6 @@
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  # Aumentamos el tiempo de espera a 120 segundos para que la IA tenga tiempo de responder
-  # Esto soluciona el "Server Components Render Error" por lentitud.
-  timeoutSeconds: 120
-  # Limitamos las instancias para controlar el coste en el TFG.
+  # Increase this value if you'd like to automatically spin up
+  # more instances in response to increased traffic.
   maxInstances: 1
-
-# Definimos las variables de entorno para que estén disponibles en el enlace público.
-env:
-  - variable: GOOGLE_GENAI_API_KEY
-    value: "AQ.Ab8RN6K1W8UTnHPAJqmnboPC_202a2kk5yf8AtY4gDr_XSmRqA"
